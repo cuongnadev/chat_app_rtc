@@ -1,9 +1,8 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from gui.windows import MainWindow
 
 
-class ChatAppRTC(QMainWindow):
+class ChatAppRTC(QWidget):
     def __init__(self):
         super().__init__()
 
@@ -11,27 +10,15 @@ class ChatAppRTC(QMainWindow):
         self.setWindowTitle("Chat App RTC")
         self.resize(1100, 650)
 
-        # Set background color for the main window
-        self.setStyleSheet(
-            """
-            QMainWindow {
-                background-color: #F7FAFC;
-            }
-        """
-        )
-
-        # Central widget
-        central_widget = QWidget()
-        central_widget.setStyleSheet("background-color: #F7FAFC;")
-        self.setCentralWidget(central_widget)
-
         # Main window content
         self.main_window = MainWindow()
 
         # Layout for central widget
-        layout = QVBoxLayout(central_widget)
+        layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.main_window)
+
+        self.setLayout(layout)
 
         # Show the window
         self.show()

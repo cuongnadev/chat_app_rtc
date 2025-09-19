@@ -47,6 +47,7 @@ class Button(QWidget):
             # Icon
             if icon_path:
                 self.icon_label = QLabel()
+                self.icon_label.setStyleSheet("background-color: transparent")
                 pixmap = QPixmap(icon_path).scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.icon_label.setPixmap(pixmap)
                 button_layout.addWidget(self.icon_label)
@@ -67,6 +68,7 @@ class Button(QWidget):
             # Icon
             if icon_path:
                 self.icon_label = QLabel()
+                self.icon_label.setStyleSheet("background-color: transparent")
                 pixmap = QPixmap(icon_path).scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.icon_label.setPixmap(pixmap)
                 button_layout.addWidget(self.icon_label)

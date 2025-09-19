@@ -18,14 +18,6 @@ class Navigation(QWidget):
         # allow stylesheet to paint the widget background
         self.setAttribute(Qt.WA_StyledBackground, True)
 
-        # stylesheet chỉ áp dụng cho chính widget này
-        self.setStyleSheet("""
-            #Navigation {
-                background-color: #3184fa;
-            }
-        """)
-
-
         main_layout = QVBoxLayout();
         main_layout.setContentsMargins(0, 10, 0, 10)
         main_layout.setAlignment(Qt.AlignTop)
