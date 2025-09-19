@@ -1,40 +1,15 @@
-from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout
-)
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 from PySide6.QtCore import Qt
-from gui.widgets import (
-    Navigation, LeftSidebar, Header, AreaMessage
-)
-
+from gui.widgets import Navigation, ChatList, Header, AreaMessage
 from pathlib import Path
+
+# [Fake data]: Chat list
+from constants.chat_list import chat_list
 
 # Lấy thư mục gốc project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 
-chat_list = [
-    {
-        "avatar": str(ASSETS_DIR / "avatarC.png"),
-        "name": "Cường Dev",
-        "last_message": "Tin nhắn mới nhất"
-    },
-    {
-        "avatar": str(ASSETS_DIR / "avatarV.png"),
-        "name": "Trần Vinh",
-        "last_message": "Tin nhắn mới nhất"
-    },
-    {
-        "avatar": str(ASSETS_DIR / "avatarB.png"),
-        "name": "Ka Bun",
-        "last_message": "Đang xem..."
-    },
-    {
-        "avatar": str(ASSETS_DIR / "avatarT.png"),
-        "name": "Đông Thi",
-        "last_message": "Ai làm bài tập chưa?"
-    },
-    # Thêm bao nhiêu chat tùy ý
-]
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -42,35 +17,91 @@ class MainWindow(QWidget):
         self.setWindowTitle("Chat App RTC")
         self.resize(1100, 650)
 
-                # ========== Navigation ==========
+        # ========== Navigation ==========
         self.navigation = Navigation()
+        self.navigation.setStyleSheet(
+            """
+            QWidget {
+                background-color: #F7FAFC;
+                color: #1A202C;
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        )
 
         # ========== Left Sidebar ==========
-        self.chat_list = LeftSidebar(chat_list)
+        self.chat_list = ChatList(chat_list)
+        self.chat_list.setStyleSheet(
+            """
+            QWidget {
+                background-color: #F7FAFC;
+                color: #1A202C;
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        )
 
         # ========== Right Panel ==========
         # Header chat
-        self.chat_header = Header("Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatar.png"))
+        self.chat_header = Header(
+            "Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatar.png")
+        )
+        self.chat_header.setStyleSheet(
+            """
+            QWidget {
+                background-color: #F7FAFC;
+                color: #1A202C;
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        )
 
         # Content chat, Ô nhập tin nhắn + nút gửi
         self.area_message = AreaMessage()
+        self.area_message.setStyleSheet(
+            """
+            QWidget {
+                background-color: #F7FAFC;
+                color: #1A202C;
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        )
 
         # Layout bên phải
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.chat_header)
-        right_layout.addWidget(self.area_message)
+        right_layout.addWidget(self.area_message, stretch=1)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
 
         # ========== Main Layout ==========
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.navigation)
         main_layout.addWidget(self.chat_list)
-        main_layout.addLayout(right_layout)
+        main_layout.addLayout(right_layout, stretch=1)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         self.setLayout(main_layout)
 
+        self.setStyleSheet(
+            """
+            QWidget {
+                background-color: #F7FAFC;
+                color: #1A202C;
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        )
+
         # Khi chọn cuộc trò chuyện trong danh sách
-        self.chat_list.currentItemChanged.connect(self.change_chat)
+        self.chat_list.get_list_widget().currentItemChanged.connect(self.change_chat)
 
     def change_chat(self, current_item, previous_item):
         """Đổi tiêu đề chat khi click bên trái"""
