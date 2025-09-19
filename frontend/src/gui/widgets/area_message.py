@@ -1,6 +1,11 @@
-from PySide6.QtWidgets import QWidget, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QTextEdit, QLineEdit, QHBoxLayout, QVBoxLayout, QWidgetAction
 from PySide6.QtCore import Signal
+from pathlib import Path
 
+from gui.widgets.button import Button
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ASSETS_DIR = BASE_DIR / "assets"
 
 class AreaMessage(QWidget):
     messageSent = Signal(str) # phát ra nội dung tin nhắn khi gửi
@@ -20,39 +25,31 @@ class AreaMessage(QWidget):
             }
         """)
 
+        # paperclip
+        self.paperclip_button = Button("", str(ASSETS_DIR / "paperclip.svg"), True, "transparent")
+
         # Ô nhập tin nhắn
         self.message_input = QLineEdit()
-        self.message_input.setPlaceholderText("Nhập tin nhắn...")
+        self.message_input.setPlaceholderText("Type a message")
         self.message_input.setStyleSheet("""
             QLineEdit {
-                padding: 10px;
-                border: 1px solid #ccc;
-                border-radius: 14px;
+                padding: 10px 20px;
+                border: 2px solid #E2E8F0;
+                border-radius: 12px;
                 font-size: 14px;
             }
             QLineEdit:focus {
-                border: 1px solid #3184fa;
+                border: 2px solid #615EF0;
             }
         """)
 
         # Nút gửi
-        self.send_button = QPushButton("Gửi")
+        self.send_button = Button("", str(ASSETS_DIR / "send.svg"), True, "transparent")
         self.send_button.clicked.connect(self.send_message)
-        self.send_button.setStyleSheet("""
-            QPushButton {
-                padding: 12px 20px;
-                background-color: #3184fa;
-                color: white;
-                border-radius: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1b6ae0;
-            }
-        """)
 
         # Layout nhập tin nhắn
         input_layout = QHBoxLayout()
+        input_layout.addWidget(self.paperclip_button)
         input_layout.addWidget(self.message_input)
         input_layout.addWidget(self.send_button)
 
