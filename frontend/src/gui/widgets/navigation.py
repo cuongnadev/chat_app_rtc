@@ -36,6 +36,7 @@ class Navigation(QWidget):
         ASSETS_DIR = BASE_DIR / "assets"
         avatar_path = str(ASSETS_DIR / "avatarC.png")
         self.avatar.setPixmap(RoundedPixmap(avatar_path, 42, 0.2))
+        self.avatar.setPixmap(RoundedPixmap(avatar_path, 42))
         self.avatar.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.avatar)
 
