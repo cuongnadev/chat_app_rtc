@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout
+    QWidget, QHBoxLayout
 )
 from PySide6.QtCore import Qt
 from pathlib import Path
@@ -72,4 +72,4 @@ class MainWindow(QWidget):
         )
 
         # Khi chọn cuộc trò chuyện trong danh sách
-        self.chat_list.currentItemChanged.connect(self.chat_panel.change_chat)
+        self.chat_list.get_list_widget().currentItemChanged.connect(self.chat_panel.change_chat)
