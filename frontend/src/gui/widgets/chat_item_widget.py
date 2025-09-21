@@ -31,7 +31,8 @@ class ChatItemWidget(QWidget):
 
         # avatar
         self.avatar = QLabel()
-        self.avatar.setPixmap(RoundedPixmap(avatar_path, 50, 0.3))
+        self.avatar.setPixmap(RoundedPixmap(avatar_path, 50, 1.0))
+        self.avatar.setStyleSheet("background: transparent;")
         main_layout.addWidget(self.avatar)
 
         # left_content

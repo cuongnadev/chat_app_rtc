@@ -8,11 +8,15 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
 )
 from PySide6.QtCore import Qt
+from pathlib import Path
 from gui.widgets import ChatItemWidget
 
+# Lấy thư mục gốc project
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ASSETS_DIR = BASE_DIR / "assets"
 
 class ChatList(QWidget):
-    def __init__(self, chat_list_data):
+    def __init__(self, chat_list_data = []):
         super().__init__()
         self.chat_list_data = chat_list_data
         main_layout = QVBoxLayout()
@@ -110,6 +114,20 @@ class ChatList(QWidget):
         """
         )
         main_layout.addWidget(self.list_widget)
+        self.load_chats(self.chat_list_data)
+
+    def update_users(self, users):
+        """Cập nhật danh sách user từ server"""
+        self.chat_list_data = [
+            {
+                "avatar": str(ASSETS_DIR / "avatar.png"),
+                "name": u["display_name"],
+                "username": u["username"],
+                "last_message": "",
+                "last_active_time": ""
+            }
+            for u in users
+        ]
         self.load_chats(self.chat_list_data)
 
     def load_chats(self, chat_list_data):

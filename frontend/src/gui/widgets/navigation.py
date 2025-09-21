@@ -25,7 +25,7 @@ class Navigation(QWidget):
 
         # avatar
         self.avatar = QLabel()
-        avatar_path = str(ASSETS_DIR / "avatarC.png")
+        avatar_path = str(ASSETS_DIR / "chat_logo.ico")
         self.avatar.setPixmap(RoundedPixmap(avatar_path, 42, 0.2))
         self.avatar.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.avatar)
