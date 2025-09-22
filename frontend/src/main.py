@@ -43,7 +43,7 @@ class ChatAppRTC(QWidget):
         if current_item:
             data = current_item.data(Qt.UserRole)   # giờ dict này có cả username
             print(f"data: {data}")
-            target = data["name"]  # lấy username
+            target = data["username"]  # lấy username
             self.client.send_message(target, message)
 
 

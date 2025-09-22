@@ -5,16 +5,7 @@ from PySide6.QtCore import QObject, Signal
 
 decoder = json.JSONDecoder()
 
-
-def parse_stream(buffer):
-    while buffer:
-        try:
-            obj, idx = decoder.raw_decode(buffer)
-            yield obj
-            buffer = buffer[idx:].lstrip()
-        except json.JSONDecodeError:
-            break
-    return buffer
+from utils import ParseStream
 
 
 class ChatClient(QObject):
@@ -28,8 +19,8 @@ class ChatClient(QObject):
         self.display_name = display_name
         self._gui_ready = False          # GUI đã connect signals chưa
         self._cached_users = None       # lưu tạm danh sách users nếu emit trước
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client.connect((host, port))
 
         # gửi login info
         login_payload = json.dumps({
@@ -37,7 +28,7 @@ class ChatClient(QObject):
             "username": self.username,
             "display_name": self.display_name
         })
-        self.sock.sendall(login_payload.encode())
+        self.client.sendall(login_payload.encode())
 
         # start listening thread
         thread = threading.Thread(target=self.listen_server, daemon=True)
@@ -47,13 +38,13 @@ class ChatClient(QObject):
         buffer = ""
         while True:
             try:
-                data = self.sock.recv(4096).decode()
+                data = self.client.recv(4096).decode()
                 if not data:
                     break
 
                 buffer += data
                 new_buffer = ""
-                for payload in parse_stream(buffer):
+                for payload in ParseStream(buffer):
                     if payload["type"] == "LOGIN_OK":
                         # login thành công
                         if not self._gui_ready:
@@ -78,7 +69,7 @@ class ChatClient(QObject):
 
     def request_users(self):
         get_users_payload = json.dumps({"type": "GET_USERS"})
-        self.sock.sendall(get_users_payload.encode())
+        self.client.sendall(get_users_payload.encode())
 
     def send_message(self, to, msg):
         payload = json.dumps({
@@ -87,7 +78,7 @@ class ChatClient(QObject):
             "from": self.username,
             "message": msg
         })
-        self.sock.sendall(payload.encode())
+        self.client.sendall(payload.encode())
 
     def gui_ready(self):
         """

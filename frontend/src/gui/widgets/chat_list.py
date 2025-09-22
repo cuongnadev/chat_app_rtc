@@ -136,18 +136,20 @@ class ChatList(QWidget):
             self.add_chat_item(
                 item["avatar"],
                 item["name"],
+                item["username"],
                 item.get("last_message", ""),
                 item.get("last_active_time", ""),
             )
 
-    def add_chat_item(self, avatar_path, name, last_message="", last_active_time=""):
+    def add_chat_item(self, avatar_path, name, username, last_message="", last_active_time=""):
         widget = ChatItemWidget(avatar_path, name, last_message, last_active_time)
         item = QListWidgetItem()
         item.setSizeHint(widget.sizeHint())
         item.setData(
             Qt.UserRole,
             {
-                "name": name,
+                "name": name,          # display_name
+                "username": username,  # thêm username chuẩn
                 "avatar_path": avatar_path,
                 "last_message": last_message,
                 "last_active_time": last_active_time,

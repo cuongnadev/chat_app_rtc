@@ -3,20 +3,10 @@ import threading
 import json
 import sys
 
+from utils import ParseStream
+
 clients = {}  # username -> {"conn": socket, "display_name": str}
 decoder = json.JSONDecoder()
-
-
-def parse_stream(buffer):
-    """Cắt từng JSON object từ buffer"""
-    while buffer:
-        try:
-            obj, idx = decoder.raw_decode(buffer)
-            yield obj
-            buffer = buffer[idx:].lstrip()
-        except json.JSONDecodeError:
-            break
-    return buffer
 
 
 def broadcast_user_list():
@@ -55,7 +45,7 @@ def handle_client(conn, addr):
             buffer += raw
             # parse nhiều JSON object trong buffer
             new_buffer = ""
-            for msg in parse_stream(buffer):
+            for msg in ParseStream(buffer):
                 if msg.get("type") == "LOGIN":
                     username = msg["username"]
                     display_name = msg["display_name"]
@@ -74,7 +64,7 @@ def handle_client(conn, addr):
                     if target in clients:
                         payload = {
                             "type": "MESSAGE",
-                            "from": username,
+                            "from": display_name,
                             "message": text
                         }
                         send_to_client(target, payload)
@@ -88,7 +78,7 @@ def handle_client(conn, addr):
                     text = msg.get("message")
                     payload = {
                         "type": "BROADCAST",
-                        "from": username,
+                        "from": display_name,
                         "message": text
                     }
                     for u in list(clients.keys()):
