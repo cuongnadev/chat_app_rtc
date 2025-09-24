@@ -1,6 +1,8 @@
 import socket
 import threading
 import json
+import base64
+from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 
 decoder = json.JSONDecoder()
@@ -12,6 +14,7 @@ class ChatClient(QObject):
     messageReceived = Signal(str, str)      # from, message
     usersUpdated = Signal(list)             # danh sách user online
     loginSuccess = Signal()
+    fileReceived = Signal(str, str, bytes)
 
     def __init__(self, username, display_name, host="127.0.0.1", port=4105):
         super().__init__()
@@ -60,6 +63,11 @@ class ChatClient(QObject):
                             self._cached_users = users
                     elif payload["type"] in ("MESSAGE", "BROADCAST"):
                         self.messageReceived.emit(payload["from"], payload["message"])
+                    elif payload["type"] == "FILE":
+                        # nhận file
+                        import base64
+                        raw_bytes = base64.b64decode(payload["data"])
+                        self.fileReceived.emit(payload["from"], payload["filename"], raw_bytes)
 
                 buffer = new_buffer
 
@@ -77,6 +85,23 @@ class ChatClient(QObject):
             "to": to,
             "from": self.username,
             "message": msg
+        })
+        self.client.sendall(payload.encode())
+
+    def send_file(self, to: str, file_path: str):
+        """Gửi file cho user"""
+        path = Path(file_path)
+        if not path.exists():
+            return
+        with open(path, "rb") as f:
+            raw = f.read()
+        b64 = base64.b64encode(raw).decode()
+        payload = json.dumps({
+            "type": "FILE",
+            "to": to,
+            "from": self.username,
+            "filename": path.name,
+            "data": b64
         })
         self.client.sendall(payload.encode())
 

@@ -74,6 +74,24 @@ def handle_client(conn, addr):
                             "message": f"User {target} not online"
                         }).encode())
 
+                elif msg.get("type") == "FILE":
+                    target = msg.get("to")
+                    filename = msg.get("filename")
+                    b64data = msg.get("data")
+                    if target in clients and target != username:
+                        payload = {
+                            "type": "FILE",
+                            "from": display_name,
+                            "filename": filename,
+                            "data": b64data
+                        }
+                        send_to_client(target, payload)
+                    else:
+                        conn.send(json.dumps({
+                            "type": "ERROR",
+                            "message": f"User {target} not online"
+                        }).encode())
+
                 elif msg.get("type") == "BROADCAST":
                     text = msg.get("message")
                     payload = {

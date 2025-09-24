@@ -5,3 +5,5 @@ from .chat_list import ChatList
 from .navigation import Navigation
 from .button import Button
 from .login_window import LoginWindow
+from .chat_bubble import ChatBubble
+from .chat_area import ChatArea
