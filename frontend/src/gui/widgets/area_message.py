@@ -1,32 +1,26 @@
-from PySide6.QtWidgets import QWidget, QTextEdit, QLineEdit, QHBoxLayout, QVBoxLayout, QWidgetAction
+from PySide6.QtWidgets import QWidget, QTextEdit, QLineEdit, QHBoxLayout, QVBoxLayout, QWidgetAction, QFileDialog
 from PySide6.QtCore import Signal
 from pathlib import Path
 
 from gui.widgets.button import Button
+from gui.widgets.chat_area import ChatArea
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 
 class AreaMessage(QWidget):
     messageSent = Signal(str) # phát ra nội dung tin nhắn khi gửi
+    file_selected = Signal(str) # phát tín hiệu ra khi người dùng chọn file
+
     def __init__(self):
         super().__init__()
 
         # Khung hiển thị tin nhắn
-        self.chat_display = QTextEdit()
-        self.chat_display.setReadOnly(True)
-        self.chat_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 10px;
-                padding: 8px;
-                font-size: 14px;
-            }
-        """)
+        self.chat_display = ChatArea()
 
         # paperclip
         self.paperclip_button = Button("", str(ASSETS_DIR / "paperclip.svg"), True, "transparent")
+        self.paperclip_button.clicked.connect(self.open_file_dialog)
 
         # Ô nhập tin nhắn
         self.message_input = QLineEdit()
@@ -63,12 +57,26 @@ class AreaMessage(QWidget):
     def send_message(self):
         message = self.message_input.text().strip()
         if message:
-            self.chat_display.append(f"<b>Bạn:</b> {message}")
+            # hiển thị bubble của mình
+            self.chat_display.add_message("Bạn", message, is_sender=True)
             self.messageSent.emit(message)  # gửi signal ra ngoài
             self.message_input.clear()
 
-    def append_message(self, sender: str, message: str):
-        self.chat_display.append(f"<b>{sender}:</b> {message}")
+    def append_message(self, sender: str, message: str, is_sender=False, file_data=None, local_path=None):
+        # hiển thị bubble người khác
+        self.chat_display.add_message(sender, message, is_sender=is_sender, file_data=file_data, local_path=local_path)
 
     def clear_message(self):
-        self.chat_display.clear();
+        # xóa hết bubble (remove tất cả widgets)
+        while self.chat_display.v_layout.count() > 1:  # chừa lại stretch
+            item = self.chat_display.v_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def open_file_dialog(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Chọn file để gửi", "", "Tất cả (*)")
+        if file_path:
+            # # hiển thị bubble sender với nút mở file
+            # self.append_message("Bạn", Path(file_path).name, local_path=file_path, is_sender=True)
+            self.file_selected.emit(file_path)

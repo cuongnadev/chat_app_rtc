@@ -20,7 +20,7 @@ class ChatPanel(QWidget):
 
         # ========== Right Panel ==========
         # Header chat
-        self.chat_header = Header("Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatarC.png"))
+        self.chat_header = Header("Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatar.png"))
 
         # Content chat, Ô nhập tin nhắn + nút gửi
         self.area_message = AreaMessage()
@@ -37,9 +37,3 @@ class ChatPanel(QWidget):
             self.chat_header.setName(data["name"])
             self.chat_header.setAvatar(data["avatar_path"])
             self.area_message.clear_message()
-
-        def send_message(self):
-            """Xử lý khi gửi tin nhắn"""
-            # print("Bạn vừa gửi:", message)
-            # Ở đây có thể gọi API gửi tin nhắn, rồi append tin nhắn trả lời:
-            # self.area_message.append_message("Bot", "Xin chào bạn!")

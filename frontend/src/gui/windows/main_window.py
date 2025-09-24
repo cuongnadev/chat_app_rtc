@@ -6,14 +6,9 @@ from pathlib import Path
 from gui.windows import ChatPanel
 from gui.widgets import Navigation, ChatList, Header, AreaMessage
 
-
-# [Fake data]: Chat list
-from constants.chat_list import chat_list
-
 # Lấy thư mục gốc project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
-
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -35,7 +30,7 @@ class MainWindow(QWidget):
         )
 
         # ========== Left Sidebar ==========
-        self.chat_list = ChatList(chat_list)
+        self.chat_list = ChatList()
         self.chat_list.setStyleSheet(
             """
             QWidget {
