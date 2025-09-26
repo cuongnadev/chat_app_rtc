@@ -11,26 +11,33 @@ from utils import ParseStream
 
 
 class ChatClient(QObject):
-    messageReceived = Signal(str, str)      # from, message
-    usersUpdated = Signal(list)             # danh sách user online
+    messageReceived = Signal(str, str)  # from, message
+    usersUpdated = Signal(list)  # danh sách user online
     loginSuccess = Signal()
     fileReceived = Signal(str, str, bytes)
+    # WebRTC signaling
+    rtcOfferReceived = Signal(str, str)  # from_username, sdp
+    rtcAnswerReceived = Signal(str, str)  # from_username, sdp
+    rtcIceReceived = Signal(str, dict)  # from_username, candidate
+    rtcEndReceived = Signal(str)  # from_username
 
     def __init__(self, username, display_name, host="127.0.0.1", port=4105):
         super().__init__()
         self.username = username
         self.display_name = display_name
-        self._gui_ready = False          # GUI đã connect signals chưa
-        self._cached_users = None       # lưu tạm danh sách users nếu emit trước
+        self._gui_ready = False  # GUI đã connect signals chưa
+        self._cached_users = None  # lưu tạm danh sách users nếu emit trước
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host, port))
 
         # gửi login info
-        login_payload = json.dumps({
-            "type": "LOGIN",
-            "username": self.username,
-            "display_name": self.display_name
-        })
+        login_payload = json.dumps(
+            {
+                "type": "LOGIN",
+                "username": self.username,
+                "display_name": self.display_name,
+            }
+        )
         self.client.sendall(login_payload.encode())
 
         # start listening thread
@@ -66,8 +73,22 @@ class ChatClient(QObject):
                     elif payload["type"] == "FILE":
                         # nhận file
                         import base64
+
                         raw_bytes = base64.b64decode(payload["data"])
-                        self.fileReceived.emit(payload["from"], payload["filename"], raw_bytes)
+                        self.fileReceived.emit(
+                            payload["from"], payload["filename"], raw_bytes
+                        )
+                    # WebRTC signaling messages from server
+                    elif payload["type"] == "RTC_OFFER":
+                        self.rtcOfferReceived.emit(payload["from"], payload["sdp"])
+                    elif payload["type"] == "RTC_ANSWER":
+                        self.rtcAnswerReceived.emit(payload["from"], payload["sdp"])
+                    elif payload["type"] == "RTC_ICE":
+                        self.rtcIceReceived.emit(
+                            payload["from"], payload.get("candidate")
+                        )
+                    elif payload["type"] == "RTC_END":
+                        self.rtcEndReceived.emit(payload["from"])
 
                 buffer = new_buffer
 
@@ -80,12 +101,9 @@ class ChatClient(QObject):
         self.client.sendall(get_users_payload.encode())
 
     def send_message(self, to, msg):
-        payload = json.dumps({
-            "type": "MESSAGE",
-            "to": to,
-            "from": self.username,
-            "message": msg
-        })
+        payload = json.dumps(
+            {"type": "MESSAGE", "to": to, "from": self.username, "message": msg}
+        )
         self.client.sendall(payload.encode())
 
     def send_file(self, to: str, file_path: str):
@@ -96,13 +114,15 @@ class ChatClient(QObject):
         with open(path, "rb") as f:
             raw = f.read()
         b64 = base64.b64encode(raw).decode()
-        payload = json.dumps({
-            "type": "FILE",
-            "to": to,
-            "from": self.username,
-            "filename": path.name,
-            "data": b64
-        })
+        payload = json.dumps(
+            {
+                "type": "FILE",
+                "to": to,
+                "from": self.username,
+                "filename": path.name,
+                "data": b64,
+            }
+        )
         self.client.sendall(payload.encode())
 
     def gui_ready(self):
@@ -114,3 +134,47 @@ class ChatClient(QObject):
         if self._cached_users:
             self.usersUpdated.emit(self._cached_users)
             self._cached_users = None
+
+    # ========== WebRTC signaling senders ==========
+    def send_rtc_offer(self, to: str, sdp: str):
+        payload = json.dumps(
+            {
+                "type": "RTC_OFFER",
+                "to": to,
+                "from": self.username,
+                "sdp": sdp,
+            }
+        )
+        self.client.sendall(payload.encode())
+
+    def send_rtc_answer(self, to: str, sdp: str):
+        payload = json.dumps(
+            {
+                "type": "RTC_ANSWER",
+                "to": to,
+                "from": self.username,
+                "sdp": sdp,
+            }
+        )
+        self.client.sendall(payload.encode())
+
+    def send_rtc_ice(self, to: str, candidate: dict):
+        payload = json.dumps(
+            {
+                "type": "RTC_ICE",
+                "to": to,
+                "from": self.username,
+                "candidate": candidate,
+            }
+        )
+        self.client.sendall(payload.encode())
+
+    def send_rtc_end(self, to: str):
+        payload = json.dumps(
+            {
+                "type": "RTC_END",
+                "to": to,
+                "from": self.username,
+            }
+        )
+        self.client.sendall(payload.encode())

@@ -15,7 +15,7 @@ def broadcast_user_list():
         users = [
             {"username": u, "display_name": c["display_name"]}
             for u, c in clients.items()
-            if u != username   # loại bỏ chính mình
+            if u != username  # loại bỏ chính mình
         ]
         payload = json.dumps({"type": "USERS", "users": users})
         try:
@@ -65,14 +65,18 @@ def handle_client(conn, addr):
                         payload = {
                             "type": "MESSAGE",
                             "from": display_name,
-                            "message": text
+                            "message": text,
                         }
                         send_to_client(target, payload)
                     else:
-                        conn.send(json.dumps({
-                            "type": "ERROR",
-                            "message": f"User {target} not online"
-                        }).encode())
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
 
                 elif msg.get("type") == "FILE":
                     target = msg.get("to")
@@ -83,21 +87,25 @@ def handle_client(conn, addr):
                             "type": "FILE",
                             "from": display_name,
                             "filename": filename,
-                            "data": b64data
+                            "data": b64data,
                         }
                         send_to_client(target, payload)
                     else:
-                        conn.send(json.dumps({
-                            "type": "ERROR",
-                            "message": f"User {target} not online"
-                        }).encode())
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
 
                 elif msg.get("type") == "BROADCAST":
                     text = msg.get("message")
                     payload = {
                         "type": "BROADCAST",
                         "from": display_name,
-                        "message": text
+                        "message": text,
                     }
                     for u in list(clients.keys()):
                         if u != username:
@@ -110,6 +118,84 @@ def handle_client(conn, addr):
                         if u != username
                     ]
                     conn.send(json.dumps({"type": "USERS", "users": users}).encode())
+
+                # ==== WebRTC signaling relay ====
+                elif msg.get("type") == "RTC_OFFER":
+                    target = msg.get("to")
+                    if target in clients and target != username:
+                        payload = {
+                            "type": "RTC_OFFER",
+                            "from": username,
+                            "from_display": clients[username]["display_name"],
+                            "sdp": msg.get("sdp"),
+                        }
+                        send_to_client(target, payload)
+                    else:
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
+
+                elif msg.get("type") == "RTC_ANSWER":
+                    target = msg.get("to")
+                    if target in clients and target != username:
+                        payload = {
+                            "type": "RTC_ANSWER",
+                            "from": username,
+                            "from_display": clients[username]["display_name"],
+                            "sdp": msg.get("sdp"),
+                        }
+                        send_to_client(target, payload)
+                    else:
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
+
+                elif msg.get("type") == "RTC_ICE":
+                    target = msg.get("to")
+                    if target in clients and target != username:
+                        payload = {
+                            "type": "RTC_ICE",
+                            "from": username,
+                            "candidate": msg.get("candidate"),
+                        }
+                        send_to_client(target, payload)
+                    else:
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
+
+                elif msg.get("type") == "RTC_END":
+                    target = msg.get("to")
+                    if target in clients and target != username:
+                        payload = {
+                            "type": "RTC_END",
+                            "from": username,
+                        }
+                        send_to_client(target, payload)
+                    else:
+                        conn.send(
+                            json.dumps(
+                                {
+                                    "type": "ERROR",
+                                    "message": f"User {target} not online",
+                                }
+                            ).encode()
+                        )
 
             buffer = new_buffer
 
