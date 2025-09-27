@@ -1,2 +1,3 @@
 from .happers import RoundedPixmap
-from .happers import ParseStream
+from .parse import ParseStream
+from .connect_thread import ConnectThread

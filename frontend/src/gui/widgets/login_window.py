@@ -1,12 +1,21 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+
+from services.chat_client import ChatClient
+from utils import ConnectThread
 
 class LoginWindow(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Login - Chat App RTC")
         self.resize(300, 150)
+        self.client = None
 
         layout = QVBoxLayout(self)
+
+        self.server_ip_input = QLineEdit()
+        self.server_ip_input.setPlaceholderText("Nhập IP server (ví dụ 192.168.1.100)")
+        layout.addWidget(QLabel("Server IP:"))
+        layout.addWidget(self.server_ip_input)
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Nhập username (định danh)")
@@ -21,7 +30,31 @@ class LoginWindow(QDialog):
         self.ok_btn = QPushButton("Kết nối")
         layout.addWidget(self.ok_btn)
 
-        self.ok_btn.clicked.connect(self.accept)
+        self.ok_btn.clicked.connect(self.attempt_login)
 
     def get_data(self):
-        return self.username_input.text().strip(), self.display_name_input.text().strip()
+        return (
+            self.server_ip_input.text().strip(),
+            self.username_input.text().strip(),
+            self.display_name_input.text().strip(),
+        )
+    
+    def attempt_login(self):
+        server_ip, username, display_name = self.get_data()
+        if not server_ip or not username:
+            QMessageBox.warning(self, "Lỗi nhập liệu", "Bạn phải nhập Server IP và Username!")
+            return
+
+        self.ok_btn.setEnabled(False)  # disable nút để tránh click nhiều lần
+        self.thread = ConnectThread(username, display_name, server_ip)
+        self.thread.finished.connect(self.on_connection_done)
+        self.thread.start()
+
+    def on_connection_done(self, client):
+        self.ok_btn.setEnabled(True)
+        if client:
+            self.client = client
+            self.accept()  # login thành công
+        else:
+            QMessageBox.critical(self, "Lỗi kết nối", "Không thể kết nối tới server!")
+

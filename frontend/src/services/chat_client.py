@@ -7,13 +7,14 @@ from PySide6.QtCore import QObject, Signal
 
 decoder = json.JSONDecoder()
 
-from utils import ParseStream
+from utils.parse import ParseStream
 
 
 class ChatClient(QObject):
     messageReceived = Signal(str, str)  # from, message
     usersUpdated = Signal(list)  # danh sách user online
     loginSuccess = Signal()
+    connectionFailed = Signal(str)
     fileReceived = Signal(str, str, bytes)
     # WebRTC signaling
     rtcOfferReceived = Signal(str, str)  # from_username, sdp
@@ -21,28 +22,46 @@ class ChatClient(QObject):
     rtcIceReceived = Signal(str, dict)  # from_username, candidate
     rtcEndReceived = Signal(str)  # from_username
 
-    def __init__(self, username, display_name, host="127.0.0.1", port=4105):
+    def __init__(self, username, display_name):
         super().__init__()
         self.username = username
         self.display_name = display_name
         self._gui_ready = False  # GUI đã connect signals chưa
         self._cached_users = None  # lưu tạm danh sách users nếu emit trước
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.connect((host, port))
+        self.client = None  # chưa tạo socket
+        self._listening_thread = None
 
-        # gửi login info
-        login_payload = json.dumps(
-            {
-                "type": "LOGIN",
-                "username": self.username,
-                "display_name": self.display_name,
-            }
-        )
-        self.client.sendall(login_payload.encode())
+    def connect_to_server(self, host: str, port: int = 4105, timeout: float = 3.0):
+        """Kết nối socket với timeout"""
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # set timeout ngắn
+        self.client.settimeout(timeout)
+
+        try:
+            self.client.connect((host, port))
+        except Exception as e:
+            self.connectionFailed.emit(str(e))
+            return False
+
+        self.client.settimeout(None)  # chuyển về blocking mode bình thường
+
+        # gửi login
+        login_payload = json.dumps({
+            "type": "LOGIN",
+            "username": self.username,
+            "display_name": self.display_name,
+        })
+        try:
+            self.client.sendall(login_payload.encode())
+        except Exception as e:
+            self.connectionFailed.emit(str(e))
+            return False
 
         # start listening thread
-        thread = threading.Thread(target=self.listen_server, daemon=True)
-        thread.start()
+        self._listening_thread = threading.Thread(target=self.listen_server, daemon=True)
+        self._listening_thread.start()
+        return True
+
 
     def listen_server(self):
         buffer = ""

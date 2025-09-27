@@ -1,4 +1,5 @@
 import os
+import sys
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QMessageBox
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
@@ -187,22 +188,13 @@ if __name__ == "__main__":
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
-    try:
-        login = LoginWindow()
-        if login.exec() == LoginWindow.Accepted:
-            username, display_name = login.get_data()
-            if username:
-                client = ChatClient(username, display_name)
-                window_holder = {}
+    login = LoginWindow()
 
-                def open_main_window():
-                    window_holder["window"] = ChatAppRTC(client)
+    if login.exec() == LoginWindow.Accepted:
+        client = login.client
+        client.connectionFailed.connect(
+            lambda msg: QMessageBox.critical(None, "Lỗi kết nối", f"{msg}")
+        )
+        main_window = ChatAppRTC(client)
 
-                client.loginSuccess.connect(open_main_window)
-
-        app.exec()
-    except Exception as e:
-        print(f"❌ Client error: {e}")
-        QMessageBox.critical(None, "Error", f"Application error:\n{e}")
-    finally:
-        print("✅ Client stopped successfully!")
+    sys.exit(app.exec())

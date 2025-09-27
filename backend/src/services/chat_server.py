@@ -3,7 +3,7 @@ import threading
 import json
 import sys
 
-from utils import ParseStream
+from utils import ParseStream, get_lan_ip
 
 clients = {}  # username -> {"conn": socket, "display_name": str}
 decoder = json.JSONDecoder()
@@ -209,13 +209,22 @@ def handle_client(conn, addr):
         conn.close()
 
 
-def app(host="127.0.0.1", port=4105):
+def app(port=4105):
+    ip_lan = get_lan_ip()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((host, port))
+
+    # Có 2 lựa chọn:
+    # 1️⃣ Bind IP LAN cụ thể
+    server.bind((ip_lan, port))
+    # 2️⃣ Hoặc bind tất cả interface
+    # server.bind(("0.0.0.0", port))
+
+
     server.listen()
     server.settimeout(1.0)
-    print(f"Server listening on {host}:{port}")
+    print(f"Server listening on {ip_lan}:{port}")
+    print(f"Clients in LAN dùng IP này để kết nối")
 
     try:
         while True:

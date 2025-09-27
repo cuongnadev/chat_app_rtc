@@ -1,8 +1,5 @@
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath
 from PySide6.QtCore import Qt, QRectF
-import json
-
-decoder = json.JSONDecoder()
 
 def RoundedPixmap(path, size=40, roundness=1.0):
     """
@@ -33,14 +30,3 @@ def RoundedPixmap(path, size=40, roundness=1.0):
     painter.end()
 
     return rounded
-
-
-def ParseStream(buffer):
-    while buffer:
-        try:
-            obj, idx = decoder.raw_decode(buffer)
-            yield obj
-            buffer = buffer[idx:].lstrip()
-        except json.JSONDecodeError:
-            break
-    return buffer
