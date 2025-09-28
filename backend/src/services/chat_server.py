@@ -224,7 +224,7 @@ def app(port=4105):
     server.listen()
     server.settimeout(1.0)
     print(f"Server listening on {ip_lan}:{port}")
-    print(f"Clients in LAN dùng IP này để kết nối")
+    print(f"Clients in LAN use this IP to connect")
 
     try:
         while True:

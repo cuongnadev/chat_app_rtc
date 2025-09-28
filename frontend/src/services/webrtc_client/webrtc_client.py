@@ -1,240 +1,10 @@
-import asyncio
-import threading
-from typing import Optional
-
-import cv2
-import numpy as np
+import asyncio, threading, cv2, pyaudio, numpy as np
 from PySide6.QtCore import QObject, Signal
-
-from aiortc import (
-    RTCPeerConnection,
-    RTCSessionDescription,
-    RTCConfiguration,
-    RTCIceServer,
-)
-from aiortc.mediastreams import VideoStreamTrack, AudioStreamTrack
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
 from av import VideoFrame, AudioFrame
-import pyaudio
-import wave
 
-
-class _CameraCapture(threading.Thread):
-    """Background camera capture thread.
-
-    Grabs frames from OpenCV and stores latest frame for both preview and WebRTC track.
-    """
-
-    def __init__(
-        self, device_index: int = 0, width: int = 640, height: int = 480, fps: int = 20
-    ):
-        super().__init__(daemon=True)
-        self.cap = None
-        self.device_index = device_index
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self._running = True
-        self.latest_bgr: Optional[np.ndarray] = None
-        self.camera_error = False
-        self._enabled = True
-        self._init_camera()
-
-    def _init_camera(self):
-        """Initialize camera with error handling"""
-        try:
-            self.cap = cv2.VideoCapture(self.device_index)
-            if not self.cap or not self.cap.isOpened():
-                raise Exception("Cannot open camera")
-
-            if self.width:
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            if self.height:
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            if self.fps:
-                self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-
-            self.camera_error = False
-        except Exception:
-            self.camera_error = True
-            self.cap = None
-
-    def set_enabled(self, enabled: bool):
-        """Enable or disable camera capture"""
-        self._enabled = enabled
-        if not enabled:
-            # Create black frame when disabled
-            self.latest_bgr = np.zeros(
-                (self.height or 480, self.width or 640, 3), dtype=np.uint8
-            )
-
-    def run(self):
-        while self._running:
-            if not self._enabled or self.camera_error or not self.cap:
-                # Show black frame or camera error frame
-                if self.camera_error:
-                    # Create error frame with text
-                    error_frame = np.full(
-                        (self.height or 480, self.width or 640, 3), 50, dtype=np.uint8
-                    )
-                    cv2.putText(
-                        error_frame,
-                        "Camera Error",
-                        (200, 240),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (255, 255, 255),
-                        2,
-                    )
-                    self.latest_bgr = error_frame
-                elif not self._enabled:
-                    # Black frame when camera is disabled
-                    self.latest_bgr = np.zeros(
-                        (self.height or 480, self.width or 640, 3), dtype=np.uint8
-                    )
-                cv2.waitKey(30)
-                continue
-
-            ret, frame = self.cap.read()
-            if ret:
-                self.latest_bgr = frame
-            else:
-                # Camera disconnected or error
-                self.camera_error = True
-            cv2.waitKey(30)
-
-    def stop(self):
-        self._running = False
-        try:
-            if self.cap:
-                self.cap.release()
-        except Exception:
-            pass
-
-
-class CameraVideoTrack(VideoStreamTrack):
-    kind = "video"
-
-    def __init__(self, capture: _CameraCapture, fps: int = 20):
-        super().__init__()
-        self.capture = capture
-        self.fps = fps
-
-    async def recv(self) -> VideoFrame:
-        # pacing
-        await asyncio.sleep(1 / float(self.fps))
-        # get current frame
-        frame = self.capture.latest_bgr
-        if frame is None:
-            # create black frame if not ready
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        # BGR -> RGB
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        video_frame = VideoFrame.from_ndarray(rgb, format="rgb24")
-        video_frame.pts, video_frame.time_base = await self.next_timestamp()
-        return video_frame
-
-
-class _MicrophoneCapture:
-    """Microphone audio capture using PyAudio"""
-
-    def __init__(
-        self, sample_rate: int = 48000, channels: int = 1, chunk_size: int = 960
-    ):
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.chunk_size = chunk_size
-        self.audio = None
-        self.stream = None
-        self.enabled = True
-        self.error = False
-        self._init_audio()
-
-    def _init_audio(self):
-        """Initialize audio with error handling"""
-        try:
-            self.audio = pyaudio.PyAudio()
-            print(
-                f"🎤 Initializing microphone: {self.sample_rate}Hz, {self.channels}ch"
-            )
-            self.stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=self.channels,
-                rate=self.sample_rate,
-                input=True,
-                frames_per_buffer=self.chunk_size,
-            )
-            self.error = False
-            print("✅ Microphone initialized successfully")
-        except Exception as e:
-            print(f"❌ Microphone initialization failed: {e}")
-            self.error = True
-            self.stream = None
-            self.audio = None
-
-    def read(self):
-        """Read audio data"""
-        if not self.enabled or self.error or not self.stream:
-            # Return silence
-            return np.zeros(self.chunk_size, dtype=np.int16)
-
-        try:
-            data = self.stream.read(self.chunk_size, exception_on_overflow=False)
-            audio_array = np.frombuffer(data, dtype=np.int16)
-
-            # Debug: Log if we're capturing significant audio
-            max_val = np.max(np.abs(audio_array))
-            if max_val > 1000:  # Only log when there's significant audio
-                print(f"🎤 Capturing audio: max level {max_val}")
-
-            return audio_array
-        except Exception as e:
-            print(f"❌ Microphone read error: {e}")
-            self.error = True
-            return np.zeros(self.chunk_size, dtype=np.int16)
-
-    def set_enabled(self, enabled: bool):
-        """Enable or disable microphone"""
-        self.enabled = enabled
-
-    def stop(self):
-        """Stop audio capture"""
-        try:
-            if self.stream:
-                self.stream.stop_stream()
-                self.stream.close()
-            if self.audio:
-                self.audio.terminate()
-        except Exception:
-            pass
-
-
-class MicrophoneAudioTrack(AudioStreamTrack):
-    kind = "audio"
-
-    def __init__(self, mic_capture: _MicrophoneCapture):
-        super().__init__()
-        self.mic = mic_capture
-
-    async def recv(self) -> AudioFrame:
-        # Read audio data
-        samples = self.mic.read()
-
-        # Debug audio capture
-        if not self.mic.error and self.mic.enabled and len(samples) > 0:
-            max_val = np.max(np.abs(samples))
-            if max_val > 1000:  # Only log significant audio to avoid spam
-                print(f"🎤 Sending audio: {len(samples)} samples, max={max_val}")
-
-        # Ensure correct shape for mono audio
-        if len(samples.shape) == 1:
-            samples = samples.reshape(1, -1)
-
-        # Convert to AudioFrame with explicit format
-        frame = AudioFrame.from_ndarray(samples, format="s16", layout="mono")
-        frame.sample_rate = self.mic.sample_rate
-        frame.pts, frame.time_base = await self.next_timestamp()
-        return frame
-
+from .camera import _CameraCapture, CameraVideoTrack
+from .microphone import _MicrophoneCapture, MicrophoneAudioTrack
 
 class WebRTCClient(QObject):
     """WebRTC manager bound to a ChatClient for signaling.
@@ -334,7 +104,7 @@ class WebRTCClient(QObject):
 
     # ========== Internal ==========
     def _ensure_pc(self):
-        if not self.pc:
+        if self.pc is None:
             self.pc = RTCPeerConnection(self._rtc_config)
 
             @self.pc.on("track")
@@ -372,32 +142,32 @@ class WebRTCClient(QObject):
 
     async def _prepare_local_media(self):
         # Prepare camera
-        if not self._camera:
+        # Camera
+        if self._camera is None:
             self._camera = _CameraCapture()
             self._camera.set_enabled(self._camera_enabled)
             self._camera.start()
             self._preview_timer_running = True
-            if not self._preview_timer.is_alive():
-                self._preview_timer = threading.Thread(
-                    target=self._emit_preview_loop, daemon=True
-                )
-                self._preview_timer.start()
-        if not self._camera_track:
-            self._camera_track = CameraVideoTrack(self._camera)
-        if self.pc and self._camera_track:
-            self.pc.addTrack(self._camera_track)
+            # restart preview thread if stopped
+            self._preview_timer = threading.Thread(
+                target=self._emit_preview_loop, daemon=True
+            )
+            self._preview_timer.start()
 
-        # Prepare microphone
-        if not self._microphone:
-            print("🎤 Initializing microphone capture...")
+        if self._camera_track is None:
+            self._camera_track = CameraVideoTrack(self._camera)
+            if self.pc:
+                self.pc.addTrack(self._camera_track)
+
+        # Microphone
+        if self._microphone is None:
             self._microphone = _MicrophoneCapture()
             self._microphone.set_enabled(self._microphone_enabled)
-        if not self._audio_track:
-            print("🎤 Creating microphone audio track...")
+
+        if self._audio_track is None:
             self._audio_track = MicrophoneAudioTrack(self._microphone)
-        if self.pc and self._audio_track:
-            print("🎤 Adding audio track to peer connection...")
-            self.pc.addTrack(self._audio_track)
+            if self.pc:
+                self.pc.addTrack(self._audio_track)
 
     def _emit_preview_loop(self):
         # Periodically emit latest frame for local preview
@@ -599,37 +369,33 @@ class WebRTCClient(QObject):
                 pass
 
     async def _end_call_async(self):
+        # Close PC
         if self.pc:
             try:
                 await self.pc.close()
             except Exception:
                 pass
             self.pc = None
-        # Cancel any running track consumer tasks
-        if getattr(self, "_track_tasks", None):
-            for t in list(self._track_tasks):
-                try:
-                    t.cancel()
-                except Exception:
-                    pass
-            self._track_tasks.clear()
-        if self._camera_track:
-            self._camera_track = None
-        if self._audio_track:
-            self._audio_track = None
+
+        # Cancel tasks
+        for t in list(self._track_tasks):
+            t.cancel()
+        self._track_tasks.clear()
+
+        # Stop camera
         if self._camera:
-            try:
-                self._preview_timer_running = False
-                self._camera.stop()
-            except Exception:
-                pass
+            self._preview_timer_running = False
+            self._camera.stop()
             self._camera = None
+        self._camera_track = None
+
+        # Stop microphone
         if self._microphone:
-            try:
-                self._microphone.stop()
-            except Exception:
-                pass
+            self._microphone.stop()
             self._microphone = None
+        self._audio_track = None
+
+        self._partner = None
         self.callEnded.emit()
 
     async def _wait_ice_gathering_complete(

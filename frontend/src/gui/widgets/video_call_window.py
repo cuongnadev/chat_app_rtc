@@ -5,9 +5,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QFrame,
-    QWidget,
     QGridLayout,
-    QSizePolicy,
 )
 from PySide6.QtGui import QImage, QPixmap, QFont, QIcon
 from PySide6.QtCore import Qt, QSize
@@ -31,11 +29,11 @@ class ControlButton(QPushButton):
         super().__init__(text)
         self.bg_color = bg_color
         self.hover_color = hover_color
-        self.setFixedSize(60, 60)
+        self.setFixedSize(54, 54)
 
         if icon_path and Path(icon_path).exists():
             self.setIcon(QIcon(str(icon_path)))
-            self.setIconSize(QSize(24, 24))
+            self.setIconSize(QSize(36, 36))
 
         self.setStyleSheet(
             f"""
@@ -43,7 +41,7 @@ class ControlButton(QPushButton):
                 background-color: {bg_color};
                 color: white;
                 border: none;
-                border-radius: 30px;
+                border-radius: 27px;
                 font-size: 12px;
                 font-weight: bold;
             }}
@@ -62,7 +60,7 @@ class VideoCallWindow(QDialog):
     def __init__(self, webrtc_client, partner_display: str):
         super().__init__()
         self.setWindowTitle(f"Video call with {partner_display}")
-        self.resize(1200, 800)
+        self.resize(1100, 650)
         self.webrtc = webrtc_client
         self.partner_display = partner_display
 
@@ -288,7 +286,7 @@ class VideoCallWindow(QDialog):
                     background-color: #68D391;
                     color: white;
                     border: none;
-                    border-radius: 30px;
+                    border-radius: 27px;
                     font-size: 12px;
                     font-weight: bold;
                 }}
@@ -305,7 +303,7 @@ class VideoCallWindow(QDialog):
                     background-color: #E53E3E;
                     color: white;
                     border: none;
-                    border-radius: 30px;
+                    border-radius: 27px;
                     font-size: 12px;
                     font-weight: bold;
                 }}
@@ -324,7 +322,7 @@ class VideoCallWindow(QDialog):
                     background-color: #4299E1;
                     color: white;
                     border: none;
-                    border-radius: 30px;
+                    border-radius: 27px;
                     font-size: 12px;
                     font-weight: bold;
                 }}
@@ -341,7 +339,7 @@ class VideoCallWindow(QDialog):
                     background-color: #E53E3E;
                     color: white;
                     border: none;
-                    border-radius: 30px;
+                    border-radius: 27px;
                     font-size: 12px;
                     font-weight: bold;
                 }}
@@ -365,6 +363,13 @@ class VideoCallWindow(QDialog):
                 self.local_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         )
+        self.local_label.setStyleSheet("""
+        QLabel {
+            background: transparent;
+            border-radius: 15px; /* đồng bộ với frame */
+        }
+        """)
+        # self.local_label.setScaledContents(True)
 
     def _update_remote(self, frame: np.ndarray):
         pix = self._ndarray_to_qpixmap(frame)

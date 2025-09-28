@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBu
 from PySide6.QtCore import Qt
 from pathlib import Path
 import os
+import sys
 import subprocess  # để mở file trên máy
 
 class ChatBubble(QWidget):
