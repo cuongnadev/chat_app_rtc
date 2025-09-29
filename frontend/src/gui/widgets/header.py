@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QCursor
 from pathlib import Path
 
 from utils.happers import RoundedPixmap
@@ -40,6 +41,7 @@ class Header(QWidget):
 
         # button call
         self.button = Button("Call", str(ASSETS_DIR / "phone.svg"))
+        self.button.setCursor(QCursor(Qt.PointingHandCursor))
 
         # status
         status_layout = QHBoxLayout()

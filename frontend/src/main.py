@@ -85,9 +85,17 @@ class ChatAppRTC(QWidget):
             target = data["username"]  # lấy username
             self.client.send_message(target, message)
 
-    def on_message_received(self, sender, message):
-        """Nhận tin nhắn từ server rồi append vào chat"""
-        self.main_window.chat_panel.area_message.append_message(sender, message)
+    def on_message_received(self, sender, message, sender_username):
+
+        current_item = self.main_window.chat_list.get_list_widget().currentItem()
+        data = current_item.data(Qt.UserRole)
+        target = data["username"]
+
+        print("sender_username: ", sender_username)
+        print("sender_username: ", target)
+        if sender_username == target:
+            """Nhận tin nhắn từ server rồi append vào chat"""
+            self.main_window.chat_panel.area_message.append_message(sender, message)
 
     def send_file(self, file_path: str):
         print("send_file called", file_path)

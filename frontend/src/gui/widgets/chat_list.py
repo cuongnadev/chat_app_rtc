@@ -45,7 +45,6 @@ class ChatList(QWidget):
             """
             QWidget {
                 background-color: #FFFFFF;
-                border-radius: 8px;
                 padding: 5px;
             }
         """

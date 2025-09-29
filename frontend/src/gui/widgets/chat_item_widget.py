@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QSizePolicy
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QCursor
 from utils.happers import RoundedPixmap
 
 
@@ -23,6 +24,7 @@ class ChatItemWidget(QWidget):
             }
         """
         )
+        self.setCursor(QCursor(Qt.PointingHandCursor))
 
         # main_layout
         main_layout = QHBoxLayout()

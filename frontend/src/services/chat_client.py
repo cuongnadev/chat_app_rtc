@@ -11,7 +11,7 @@ from utils.parse import ParseStream
 
 
 class ChatClient(QObject):
-    messageReceived = Signal(str, str)  # from, message
+    messageReceived = Signal(str, str, str)  # from, message
     usersUpdated = Signal(list)  # danh sách user online
     loginSuccess = Signal()
     connectionFailed = Signal(str)
@@ -80,6 +80,7 @@ class ChatClient(QObject):
                             self.loginSuccess.emit()  # GUI connect signals
                         # gửi yêu cầu users sau GUI connect
                         self.request_users()
+
                     elif payload["type"] == "USERS":
                         users = payload.get("users", [])
                         if self._gui_ready:
@@ -87,8 +88,12 @@ class ChatClient(QObject):
                         else:
                             # lưu tạm
                             self._cached_users = users
+
                     elif payload["type"] in ("MESSAGE", "BROADCAST"):
-                        self.messageReceived.emit(payload["from"], payload["message"])
+                        print("client: ", payload)
+                        from_username = payload.get("from_username", None)
+                        self.messageReceived.emit(payload["from"], payload["message"], from_username)
+
                     elif payload["type"] == "FILE":
                         # nhận file
                         import base64
@@ -97,6 +102,7 @@ class ChatClient(QObject):
                         self.fileReceived.emit(
                             payload["from"], payload["filename"], raw_bytes
                         )
+
                     # WebRTC signaling messages from server
                     elif payload["type"] == "RTC_OFFER":
                         self.rtcOfferReceived.emit(payload["from"], payload["sdp"])

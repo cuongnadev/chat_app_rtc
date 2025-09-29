@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget, QLabel, QPushButton, QSizePolicy
 )
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QCursor
 from pathlib import Path
 
 from utils.happers import RoundedPixmap
@@ -28,6 +28,7 @@ class Navigation(QWidget):
         avatar_path = str(ASSETS_DIR / "chat_logo.ico")
         self.avatar.setPixmap(RoundedPixmap(avatar_path, 42, 0.2))
         self.avatar.setAlignment(Qt.AlignCenter)
+        self.avatar.setCursor(QCursor(Qt.PointingHandCursor))
         main_layout.addWidget(self.avatar)
 
         # home
@@ -41,10 +42,12 @@ class Navigation(QWidget):
                 border-radius: 20px;
                 border: none;
             }
-            QPushButton:hover {
+            QPushButton:hover, QPushButton:checked {
                 background-color: rgba(97, 94, 240, 0.10);
             }
         """)
+        self.home.setCursor(QCursor(Qt.PointingHandCursor))
+        self.home.setCheckable(True)
 
         # messages
         self.messages = QPushButton()
@@ -57,21 +60,21 @@ class Navigation(QWidget):
                 border-radius: 20px;
                 border: none;
             }
-            QPushButton:hover {
+            QPushButton:hover, QPushButton:checked {
                 background-color: rgba(97, 94, 240, 0.10);
             }
         """)
+        self.messages.setCursor(QCursor(Qt.PointingHandCursor))
+        self.messages.setCheckable(True)
 
         nav_layout = QVBoxLayout()
         nav_layout.setContentsMargins(0, 10, 0, 10)
         nav_layout.setSpacing(10)
         nav_layout.setAlignment(Qt.AlignCenter)
-
         nav_layout.addWidget(self.home)
         nav_layout.addWidget(self.messages)
 
         main_layout.addLayout(nav_layout)
-
         main_layout.addStretch()
 
         # setting
@@ -89,9 +92,25 @@ class Navigation(QWidget):
                 background-color: rgba(97, 94, 240, 0.10);
             }
         """)
+        self.settings.setCursor(QCursor(Qt.PointingHandCursor))
         main_layout.addWidget(self.settings, alignment=Qt.AlignCenter)
 
         self.setLayout(main_layout)
+
+        self.home.setChecked(True)
+
+        # Khi nhấn Home → ẩn chat_list + chat_panel
+        self.home.clicked.connect(lambda: self.select_nav(self.home))
+
+        # Khi nhấn Messages → hiện chat_list + chat_panel
+        self.messages.clicked.connect(lambda: self.select_nav(self.messages))
+
+    def select_nav(self, btn):
+        for b in [self.home, self.messages]:
+            if b != btn:
+                b.setChecked(False)
+        btn.setChecked(True)
+
         
 
 

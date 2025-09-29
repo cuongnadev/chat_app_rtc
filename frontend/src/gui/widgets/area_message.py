@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import QWidget, QTextEdit, QLineEdit, QHBoxLayout, QVBoxLayout, QWidgetAction, QFileDialog
-from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QWidget, QLineEdit, QHBoxLayout, QVBoxLayout, QFileDialog
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QIcon, QCursor
 from pathlib import Path
 
 from gui.widgets.button import Button
@@ -21,13 +22,14 @@ class AreaMessage(QWidget):
         # paperclip
         self.paperclip_button = Button("", str(ASSETS_DIR / "paperclip.svg"), True, "transparent")
         self.paperclip_button.clicked.connect(self.open_file_dialog)
+        self.paperclip_button.setCursor(QCursor(Qt.PointingHandCursor))
 
         # Ô nhập tin nhắn
         self.message_input = QLineEdit()
         self.message_input.setPlaceholderText("Type a message")
         self.message_input.setStyleSheet("""
             QLineEdit {
-                padding: 10px 20px;
+                padding: 10px;
                 border: 2px solid #E2E8F0;
                 border-radius: 12px;
                 font-size: 14px;
@@ -37,9 +39,21 @@ class AreaMessage(QWidget):
             }
         """)
 
+        # mic action
+        icon_default = QIcon(str(ASSETS_DIR / "mic.svg"))
+        # tạo pixmap 24x24
+        pixmap = icon_default.pixmap(40, 40)
+        big_icon = QIcon(pixmap)
+
+        self.mic_action = self.message_input.addAction(
+            big_icon, QLineEdit.TrailingPosition
+        )
+        self.mic_action.triggered.connect(self.start_recording)
+
         # Nút gửi
         self.send_button = Button("", str(ASSETS_DIR / "send.svg"), True, "transparent")
         self.send_button.clicked.connect(self.send_message)
+        self.send_button.setCursor(QCursor(Qt.PointingHandCursor))
 
         # Layout nhập tin nhắn
         input_layout = QHBoxLayout()
@@ -80,3 +94,6 @@ class AreaMessage(QWidget):
             # # hiển thị bubble sender với nút mở file
             # self.append_message("Bạn", Path(file_path).name, local_path=file_path, is_sender=True)
             self.file_selected.emit(file_path)
+
+    def start_recording(self):
+        print("Mic clicked - start recording")

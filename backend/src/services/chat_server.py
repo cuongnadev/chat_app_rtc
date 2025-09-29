@@ -25,6 +25,7 @@ def broadcast_user_list():
 
 
 def send_to_client(target_username, payload):
+    print("server: ", payload)
     """Gửi payload JSON tới một client"""
     if target_username in clients:
         try:
@@ -61,11 +62,13 @@ def handle_client(conn, addr):
                 elif msg.get("type") == "MESSAGE":
                     target = msg.get("to")
                     text = msg.get("message")
+                    from_username = msg.get("from")
                     if target in clients:
                         payload = {
                             "type": "MESSAGE",
                             "from": display_name,
                             "message": text,
+                            "from_username": from_username
                         }
                         send_to_client(target, payload)
                     else:
