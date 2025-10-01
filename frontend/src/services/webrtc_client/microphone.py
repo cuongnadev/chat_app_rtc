@@ -10,7 +10,7 @@ class _MicrophoneCapture:
     """Microphone audio capture using PyAudio"""
 
     def __init__(
-        self, sample_rate: int = 16000, channels: int = 1, chunk_size: int = 320
+        self, sample_rate: int = 48000, channels: int = 1, chunk_size: int = 960
     ):
         self.sample_rate = sample_rate
         self.channels = channels
@@ -79,6 +79,9 @@ class _MicrophoneCapture:
             )
             self.error = False
             print("✅ Microphone initialized successfully")
+            print(
+                f"📊 Audio settings: {self.sample_rate}Hz, {self.channels}ch, {frames_per_buffer} frames/buffer"
+            )
         except Exception as e:
             print(f"❌ Microphone initialization failed: {e}")
             self.error = True
@@ -114,11 +117,6 @@ class _MicrophoneCapture:
                 # Multi-channel: reshape to (samples, channels) - deinterleave
                 samples_per_channel = len(audio_array) // self.channels
                 audio_array = audio_array.reshape(samples_per_channel, self.channels)
-
-            # Debug: Log if capturing significant audio
-            max_val = np.max(np.abs(audio_array))
-            if max_val > 1000:
-                print(f"🎤 Capturing audio: level {max_val}, shape={audio_array.shape}")
 
             return audio_array
         except Exception as e:
@@ -170,9 +168,6 @@ class MicrophoneAudioTrack(AudioStreamTrack):
             if self.mic.channels > 1 and samples.ndim == 2:
                 # Average channels to create mono
                 samples = samples.mean(axis=1).astype(np.int16)
-                print(
-                    f"🔄 Converted {self.mic.channels}ch to mono, shape={samples.shape}"
-                )
 
             # Ensure 1D and contiguous
             if samples.ndim > 1:
@@ -181,9 +176,6 @@ class MicrophoneAudioTrack(AudioStreamTrack):
 
             layout = "mono"  # Force mono for now
 
-            print(
-                f"🔧 Frame shape: {samples.shape}, layout={layout}, dtype={samples.dtype}, contiguous={samples.flags['C_CONTIGUOUS']}"
-            )
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
             frame.sample_rate = self.mic.sample_rate
         except Exception as e:

@@ -1,10 +1,16 @@
 import asyncio, threading, cv2, pyaudio, numpy as np
 from PySide6.QtCore import QObject, Signal
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
+from aiortc import (
+    RTCPeerConnection,
+    RTCSessionDescription,
+    RTCConfiguration,
+    RTCIceServer,
+)
 from av import VideoFrame, AudioFrame
 
 from .camera import _CameraCapture, CameraVideoTrack
 from .microphone import _MicrophoneCapture, MicrophoneAudioTrack
+
 
 class WebRTCClient(QObject):
     """WebRTC manager bound to a ChatClient for signaling.
@@ -157,7 +163,8 @@ class WebRTCClient(QObject):
         if self._camera_track is None:
             self._camera_track = CameraVideoTrack(self._camera)
             if self.pc:
-                self.pc.addTrack(self._camera_track)
+                sender = self.pc.addTrack(self._camera_track)
+                print(f"📹 Added video track: {self._camera_track.kind}")
 
         # Microphone
         if self._microphone is None:
@@ -167,7 +174,8 @@ class WebRTCClient(QObject):
         if self._audio_track is None:
             self._audio_track = MicrophoneAudioTrack(self._microphone)
             if self.pc:
-                self.pc.addTrack(self._audio_track)
+                sender = self.pc.addTrack(self._audio_track)
+                print(f"🎤 Added audio track: {self._audio_track.kind}")
 
     def _emit_preview_loop(self):
         # Periodically emit latest frame for local preview
@@ -280,14 +288,16 @@ class WebRTCClient(QObject):
         try:
             # Initialize PyAudio for playback
             audio = pyaudio.PyAudio()
+
+            # Use same settings as microphone for consistency
             stream = audio.open(
                 format=pyaudio.paInt16,
                 channels=1,
-                rate=48000,
+                rate=48000,  # Match microphone sample rate
                 output=True,
-                frames_per_buffer=960,
+                frames_per_buffer=960,  # 20ms at 48kHz
             )
-            print("✅ Audio playback stream initialized")
+            print("✅ Audio playback stream initialized (48kHz, mono)")
 
             frame_count = 0
             while True:
@@ -295,14 +305,12 @@ class WebRTCClient(QObject):
                     frame: AudioFrame = await track.recv()
                     frame_count += 1
 
-                    # Get frame info
-                    sample_rate = frame.sample_rate
-                    channels = len(frame.layout.channels)
-
-                    # Debug frame info
+                    # Debug frame info only once
                     if frame_count == 1:
+                        sample_rate = frame.sample_rate
+                        channels = len(frame.layout.channels)
                         print(
-                            f"🔊 Audio frame info: {sample_rate}Hz, {channels}ch, format={frame.format.name}"
+                            f"🔊 Receiving audio: {sample_rate}Hz, {channels}ch, format={frame.format.name}"
                         )
 
                     # Convert frame to numpy array with proper format handling
@@ -322,34 +330,23 @@ class WebRTCClient(QObject):
                     elif len(audio_data.shape) > 1:
                         audio_data = audio_data[0]  # Take first channel
 
-                    # Debug received audio
-                    if frame_count % 100 == 0:  # Log every 100 frames to avoid spam
-                        max_val = (
-                            np.max(np.abs(audio_data)) if len(audio_data) > 0 else 0
-                        )
-                        print(
-                            f"🔊 Frame {frame_count}: {len(audio_data)} samples, max={max_val}"
-                        )
-
                     # Play audio data if we have samples
                     if len(audio_data) > 0:
                         stream.write(audio_data.tobytes())
 
+                    # Log periodically for monitoring
+                    if frame_count % 500 == 0:
+                        max_val = (
+                            np.max(np.abs(audio_data)) if len(audio_data) > 0 else 0
+                        )
+                        print(
+                            f"🔊 Received {frame_count} frames, last level: {max_val}"
+                        )
+
                 except Exception as frame_error:
-                    frame_count += 1
-                    # Only log first few errors to avoid spam
-                    if frame_count <= 10 or frame_count % 100 == 0:
+                    # Log first error for debugging
+                    if frame_count <= 5:
                         print(f"⚠️ Audio frame error #{frame_count}: {frame_error}")
-
-                    # If too many consecutive errors, break
-                    if frame_count > 20:
-                        error_ratio = frame_count / max(1, frame_count)
-                        if error_ratio > 0.8:  # 80% error rate
-                            print(
-                                f"❌ Too many audio errors ({error_ratio:.1%}), stopping consumption"
-                            )
-                            break
-
                     continue
 
         except Exception as e:
