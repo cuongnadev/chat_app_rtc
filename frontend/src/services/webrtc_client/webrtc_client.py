@@ -8,6 +8,7 @@ from aiortc import (
     RTCIceServer,
 )
 from av import VideoFrame, AudioFrame
+from aiortc.mediastreams import AudioStreamTrack
 
 from .camera import _CameraCapture, CameraVideoTrack
 from .microphone import _MicrophoneCapture, MicrophoneAudioTrack
@@ -284,14 +285,12 @@ class WebRTCClient(QObject):
 
     async def _consume_remote_audio_track(self, track: AudioStreamTrack):
         print("🔊 Starting remote audio track consumption...")
-
         p = pyaudio.PyAudio()
 
-        # Lấy output device mặc định
+        # Output device
         output_device_index = None
         out_channels = 2
         out_rate = 44100
-
         try:
             default_info = p.get_default_output_device_info()
             output_device_index = default_info["index"]
@@ -300,16 +299,14 @@ class WebRTCClient(QObject):
             print(f"🎧 Using default output device: {default_info['name']} ({out_channels}ch, {out_rate}Hz)")
         except IOError:
             print("⚠️ Cannot get default output device, using fallback")
-            output_device_index = None
 
-        frames_per_buffer = 1024
         stream = p.open(
             format=pyaudio.paInt16,
             channels=out_channels,
             rate=out_rate,
             output=True,
             output_device_index=output_device_index,
-            frames_per_buffer=frames_per_buffer
+            frames_per_buffer=1024
         )
         print("✅ Audio playback stream initialized")
 
@@ -317,25 +314,26 @@ class WebRTCClient(QObject):
             while True:
                 frame: AudioFrame = await track.recv()
                 audio_data = frame.to_ndarray(format="s16")
-                print(f"📥 Received frame: {audio_data.shape}, sample_rate={frame.sample_rate}")
+                print(f"📥 Received frame: shape={audio_data.shape}, sample_rate={frame.sample_rate}")
 
-                # Resample nếu sample rate khác
+                # Resample nếu rate khác
                 if frame.sample_rate != out_rate:
                     audio_data = ResampleAudio(audio_data, frame.sample_rate, out_rate)
+                    print(f"🔄 Resampled: new shape={audio_data.shape}, new_rate={out_rate}")
 
                 # Convert kênh
                 if audio_data.ndim == 1 and out_channels > 1:
                     audio_data = np.tile(audio_data[:, None], (1, out_channels))
-                    print(f"🔀 Converted mono -> {out_channels}ch, shape={audio_data.shape}")
+                    print(f"🔀 Mono -> {out_channels}ch: shape={audio_data.shape}")
                 elif audio_data.ndim == 2 and audio_data.shape[1] != out_channels:
                     if out_channels == 1:
                         audio_data = np.mean(audio_data, axis=1).astype(np.int16)
-                        print(f"🔀 Converted stereo -> mono, shape={audio_data.shape}")
+                        print(f"🔀 Stereo -> Mono: shape={audio_data.shape}")
                     else:
                         audio_data = audio_data[:, :out_channels]
-                        print(f"🔀 Trimmed channels to {out_channels}, shape={audio_data.shape}")
+                        print(f"🔀 Trimmed channels: shape={audio_data.shape}")
 
-                # Ghi vào stream
+                # Ghi stream
                 stream.write(audio_data.astype(np.int16).tobytes())
                 print(f"▶️ Wrote {audio_data.shape[0]} frames to output")
 
@@ -346,6 +344,7 @@ class WebRTCClient(QObject):
             stream.close()
             p.terminate()
             print("🔇 Remote audio playback stopped.")
+
 
     async def _end_call_async(self):
         # Close PC
