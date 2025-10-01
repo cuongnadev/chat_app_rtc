@@ -281,10 +281,9 @@ class WebRTCClient(QObject):
             # track ended
             pass
 
-    async def _consume_remote_audio_track(self, track):
+    async def _consume_remote_audio_track(track):
         print("🔊 Starting remote audio track consumption...")
 
-        # Playback config (mono 48kHz)
         p = pyaudio.PyAudio()
         stream = p.open(format=pyaudio.paInt16,
                         channels=1,
@@ -292,16 +291,13 @@ class WebRTCClient(QObject):
                         output=True)
         print("✅ Audio playback stream initialized (48kHz, mono)")
 
-        async for frame in track.frames():
-            if not isinstance(frame, AudioFrame):
-                continue
-
-            try:
-                audio_data = frame.to_ndarray(format="s16")  # shape (ch, samples) hoặc (samples,)
+        try:
+            while True:
+                frame: AudioFrame = await track.recv()
+                audio_data = frame.to_ndarray(format="s16")  # (ch, samples) hoặc (samples,)
                 layout = frame.layout.name
 
                 if audio_data.ndim == 2:
-                    # Lấy trung bình kênh → mono
                     audio_data = np.mean(audio_data, axis=0).astype(np.int16)
 
                 max_val = int(np.max(np.abs(audio_data)))
@@ -310,13 +306,13 @@ class WebRTCClient(QObject):
                         f"layout={layout}, level={max_val}")
 
                 stream.write(audio_data.tobytes())
-            except Exception as e:
-                print(f"⚠️ Error processing remote audio frame: {e}")
-
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
-        print("🔇 Remote audio playback stopped.")
+        except Exception as e:
+            print(f"⚠️ Track consumer stopped: {e}")
+        finally:
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+            print("🔇 Remote audio playback stopped.")
 
     async def _end_call_async(self):
         # Close PC
