@@ -281,14 +281,36 @@ class WebRTCClient(QObject):
             # track ended
             pass
 
-    async def _consume_remote_audio_track(track):
+    async def _consume_remote_audio_track(self, track):
         print("🔊 Starting remote audio track consumption...")
 
         p = pyaudio.PyAudio()
+
+        # --- Lấy thiết bị output mặc định hoặc PulseAudio ---
+        output_device_index = None
+        for i in range(p.get_device_count()):
+            info = p.get_device_info_by_index(i)
+            if info.get('maxOutputChannels', 0) > 0:
+                name = info.get('name', '').lower()
+                # ưu tiên PulseAudio
+                if 'pulse' in name:
+                    output_device_index = i
+                    break
+                if output_device_index is None:
+                    output_device_index = i  # fallback: device đầu tiên
+
+        if output_device_index is None:
+            print("❌ Không tìm thấy thiết bị playback, dùng mặc định")
+            output_device_index = None  # PyAudio tự chọn
+
+        print(f"🎧 Using output device index: {output_device_index}")
+
+
         stream = p.open(format=pyaudio.paInt16,
                         channels=1,
                         rate=48000,
-                        output=True)
+                        output=True
+                        output_device_index=output_device_index)
         print("✅ Audio playback stream initialized (48kHz, mono)")
 
         try:
