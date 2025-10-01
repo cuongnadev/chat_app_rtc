@@ -282,59 +282,61 @@ class WebRTCClient(QObject):
             pass
 
     async def _consume_remote_audio_track(self, track):
-        # import pyaudio
-        # import numpy as np
-        # from av import AudioFrame
 
         print("🔊 Starting remote audio track consumption...")
-
-        # --- Liệt kê output devices ---
         p = pyaudio.PyAudio()
+
+        # --- Tìm thiết bị output mặc định ---
         output_device_index = None
-        print("🔍 Available output devices:")
-        for i in range(p.get_device_count()):
-            info = p.get_device_info_by_index(i)
-            if info.get("maxOutputChannels", 0) > 0:
-                print(f"  [{i}] {info['name']} - {info['maxOutputChannels']}ch")
-                if "alsa_output" in info['name'] or "Speaker" in info['name']:
-                    output_device_index = i  # ưu tiên loa chính
+        channels = 1
+        rate = 48000
+        try:
+            default_info = p.get_default_output_device_info()
+            output_device_index = default_info["index"]
+            channels = default_info["maxOutputChannels"]
+            rate = int(default_info["defaultSampleRate"])
+            print(f"🎧 Using default output device: {default_info['name']} ({channels}ch, {rate}Hz)")
+        except IOError:
+            print("❌ Cannot get default output device, using fallback")
+            output_device_index = None
 
-        if output_device_index is None:
-            print("⚠️ No preferred device found, using default")
-            try:
-                default_info = p.get_default_output_device_info()
-                output_device_index = default_info["index"]
-                print(f"🎧 Default device: {default_info['name']} (index {output_device_index})")
-            except IOError:
-                print("❌ Không tìm thấy thiết bị playback, dùng mặc định PyAudio")
-                output_device_index = None
-
-        # --- Open PyAudio stream ---
+        # Mở stream PyAudio đúng channels và rate
         stream = p.open(
             format=pyaudio.paInt16,
-            channels=1,
-            rate=48000,
+            channels=channels,
+            rate=rate,
             output=True,
             output_device_index=output_device_index,
+            frames_per_buffer=960,  # tương ứng với chunk WebRTC 20ms
         )
-        print("✅ Audio playback stream initialized (48kHz, mono)")
+        print("✅ Audio playback stream initialized")
 
         try:
             while True:
                 frame: AudioFrame = await track.recv()
-                audio_data = frame.to_ndarray(format="s16")  # (ch, samples) hoặc (samples,)
+                audio_data = frame.to_ndarray(format="s16")
 
-                # --- convert stereo -> mono nếu cần ---
+                # Nếu stereo, convert theo channels thiết bị
                 if audio_data.ndim == 2:
-                    audio_data = np.mean(audio_data, axis=0).astype(np.int16)
+                    if audio_data.shape[1] != channels:
+                        # Reshape/copy kênh
+                        if channels == 1:
+                            audio_data = np.mean(audio_data, axis=1).astype(np.int16)
+                        elif channels == 2:
+                            if audio_data.shape[1] == 1:
+                                audio_data = np.repeat(audio_data, 2, axis=1)
+                            else:
+                                audio_data = audio_data[:, :2]  # lấy 2 kênh đầu
+                        else:
+                            audio_data = audio_data[:, :channels]
+                    audio_data = audio_data.flatten()
+                else:
+                    # mono
+                    if channels > 1:
+                        audio_data = np.repeat(audio_data, channels)
 
-                # --- debug level ---
-                max_val = int(np.max(np.abs(audio_data)))
-                if max_val > 0:
-                    print(f"🔉 Remote frame: shape={audio_data.shape}, max_val={max_val}")
-
-                # --- write to stream ---
                 stream.write(audio_data.tobytes())
+
         except Exception as e:
             print(f"⚠️ Track consumer stopped: {e}")
         finally:
