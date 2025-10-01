@@ -88,30 +88,47 @@ class _MicrophoneCapture:
                 self.audio = None
 
     def read(self):
-        """Read audio data as 1D interleaved array"""
+        """Read audio data - returns format based on channels"""
         if not self.enabled or self.error or not self.stream:
             if self.error:
                 print("♻️ Retrying microphone init...")
                 time.sleep(1)
                 self._init_audio()
-            # Return silence 1D
-            return np.zeros(self.chunk_size, dtype=np.int16)
+            # Return silence in correct format
+            samples_per_channel = self.chunk_size // self.channels
+            if self.channels == 1:
+                return np.zeros(samples_per_channel, dtype=np.int16)
+            else:
+                return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
 
         try:
             frames_per_buffer = self.chunk_size // self.channels
             data = self.stream.read(frames_per_buffer, exception_on_overflow=False)
             audio_array = np.frombuffer(data, dtype=np.int16)
 
+            # Reshape based on channels
+            if self.channels == 1:
+                # Mono: keep as 1D
+                pass
+            else:
+                # Multi-channel: reshape to (samples, channels) - deinterleave
+                samples_per_channel = len(audio_array) // self.channels
+                audio_array = audio_array.reshape(samples_per_channel, self.channels)
+
             # Debug: Log if capturing significant audio
             max_val = np.max(np.abs(audio_array))
             if max_val > 1000:
                 print(f"🎤 Capturing audio: level {max_val}, shape={audio_array.shape}")
 
-            return audio_array  # Already 1D interleaved
+            return audio_array
         except Exception as e:
             print(f"❌ Microphone read error: {e}")
             self.error = True
-            return np.zeros(self.chunk_size, dtype=np.int16)
+            samples_per_channel = self.chunk_size // self.channels
+            if self.channels == 1:
+                return np.zeros(samples_per_channel, dtype=np.int16)
+            else:
+                return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
 
     def set_enabled(self, enabled: bool):
         """Enable or disable microphone"""
@@ -140,24 +157,51 @@ class MicrophoneAudioTrack(AudioStreamTrack):
         samples = self.mic.read()
 
         if samples is None or len(samples) == 0 or samples.size == 0:
-            samples = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            if self.mic.channels == 1:
+                samples = np.zeros(samples_per_channel, dtype=np.int16)
+            else:
+                samples = np.zeros(
+                    (samples_per_channel, self.mic.channels), dtype=np.int16
+                )
 
         layout = "mono" if self.mic.channels == 1 else "stereo"
 
         try:
-            # Ensure samples is 1D for PyAV
-            if samples.ndim > 1:
-                samples = samples.flatten(
-                    "C"
-                )  # Flatten in row-major (interleaved) order
+            # PyAV expects:
+            # - Mono: 1D array (samples,)
+            # - Stereo: 2D array (samples, 2) - NOT interleaved
 
-            print(f"🔧 Frame shape before build: {samples.shape}, layout={layout}")
+            if self.mic.channels == 1:
+                # Ensure 1D for mono
+                if samples.ndim > 1:
+                    samples = samples.flatten()
+            else:
+                # Ensure 2D (samples, channels) for stereo
+                if samples.ndim == 1:
+                    # Convert interleaved 1D to 2D
+                    samples_per_channel = len(samples) // self.mic.channels
+                    samples = samples.reshape(samples_per_channel, self.mic.channels)
+
+            print(
+                f"🔧 Frame shape: {samples.shape}, layout={layout}, dtype={samples.dtype}"
+            )
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
+            frame.sample_rate = self.mic.sample_rate
         except Exception as e:
-            print(f"⚠️ Audio frame build error: {e}, shape={samples.shape}")
-            silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            print(
+                f"⚠️ Audio frame build error: {e}, shape={samples.shape}, layout={layout}"
+            )
+            # Create silence frame
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            if self.mic.channels == 1:
+                silence = np.zeros(samples_per_channel, dtype=np.int16)
+            else:
+                silence = np.zeros(
+                    (samples_per_channel, self.mic.channels), dtype=np.int16
+                )
             frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
+            frame.sample_rate = self.mic.sample_rate
 
-        frame.sample_rate = self.mic.sample_rate
         frame.pts, frame.time_base = await self.next_timestamp()
         return frame
