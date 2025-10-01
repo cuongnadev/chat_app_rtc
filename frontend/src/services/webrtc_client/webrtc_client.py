@@ -282,90 +282,41 @@ class WebRTCClient(QObject):
             pass
 
     async def _consume_remote_audio_track(self, track):
-        """Consume remote audio track and play through speakers"""
         print("🔊 Starting remote audio track consumption...")
-        audio = None
-        stream = None
 
-        try:
-            # Initialize PyAudio for playback
-            audio = pyaudio.PyAudio()
+        # Playback config (mono 48kHz)
+        p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16,
+                        channels=1,
+                        rate=48000,
+                        output=True)
+        print("✅ Audio playback stream initialized (48kHz, mono)")
 
-            # Use same settings as microphone for consistency
-            stream = audio.open(
-                format=pyaudio.paInt16,
-                channels=1,
-                rate=48000,  # Match microphone sample rate
-                output=True,
-                frames_per_buffer=960,  # 20ms at 48kHz
-            )
-            print("✅ Audio playback stream initialized (48kHz, mono)")
+        async for frame in track.frames():
+            if not isinstance(frame, AudioFrame):
+                continue
 
-            frame_count = 0
-            while True:
-                try:
-                    frame: AudioFrame = await track.recv()
-                    frame_count += 1
-
-                    # Debug frame info only once
-                    if frame_count == 1:
-                        sample_rate = frame.sample_rate
-                        channels = len(frame.layout.channels)
-                        print(
-                            f"🔊 Receiving audio: {sample_rate}Hz, {channels}ch, format={frame.format.name}"
-                        )
-
-                    # Convert frame to numpy array with proper format handling
-                    if frame.format.name in ["s16", "s16p"]:
-                        audio_data = frame.to_ndarray(format="s16", layout="mono")
-                    elif frame.format.name in ["flt", "fltp"]:
-                        # Convert float to int16
-                        audio_data = frame.to_ndarray(format="flt", layout="mono")
-                        audio_data = (audio_data * 32767).astype(np.int16)
-                    else:
-                        # Fallback: try to convert to s16
-                        audio_data = frame.to_ndarray(format="s16", layout="mono")
-
-                    # Handle multi-channel to mono conversion
-                    if len(audio_data.shape) > 1 and audio_data.shape[0] > 1:
-                        audio_data = np.mean(audio_data, axis=0).astype(np.int16)
-                    elif len(audio_data.shape) > 1:
-                        audio_data = audio_data[0]  # Take first channel
-
-                    # Play audio data if we have samples
-                    if len(audio_data) > 0:
-                        stream.write(audio_data.tobytes())
-
-                    # Log periodically for monitoring
-                    if frame_count % 500 == 0:
-                        max_val = (
-                            np.max(np.abs(audio_data)) if len(audio_data) > 0 else 0
-                        )
-                        print(
-                            f"🔊 Received {frame_count} frames, last level: {max_val}"
-                        )
-
-                except Exception as frame_error:
-                    # Log first error for debugging
-                    if frame_count <= 5:
-                        print(f"⚠️ Audio frame error #{frame_count}: {frame_error}")
-                    continue
-
-        except Exception as e:
-            import traceback
-
-            print(f"❌ Audio track consumption error: {e}")
-            print(f"Error details: {traceback.format_exc()}")
-        finally:
-            print("🔊 Stopping remote audio track...")
             try:
-                if stream:
-                    stream.stop_stream()
-                    stream.close()
-                if audio:
-                    audio.terminate()
-            except Exception:
-                pass
+                audio_data = frame.to_ndarray(format="s16")  # shape (ch, samples) hoặc (samples,)
+                layout = frame.layout.name
+
+                if audio_data.ndim == 2:
+                    # Lấy trung bình kênh → mono
+                    audio_data = np.mean(audio_data, axis=0).astype(np.int16)
+
+                max_val = int(np.max(np.abs(audio_data)))
+                if max_val > 500:
+                    print(f"🔉 Remote frame: {audio_data.shape}, rate={frame.sample_rate}, "
+                        f"layout={layout}, level={max_val}")
+
+                stream.write(audio_data.tobytes())
+            except Exception as e:
+                print(f"⚠️ Error processing remote audio frame: {e}")
+
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+        print("🔇 Remote audio playback stopped.")
 
     async def _end_call_async(self):
         # Close PC
