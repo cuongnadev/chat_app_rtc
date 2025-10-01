@@ -3,7 +3,7 @@ import asyncio
 import pyaudio
 import time
 import threading
-from aiortc.mediastreams import AudioStreamTrack
+from aiortc.mediastreams import AudioStreamTrack, MediaStreamTrack
 from av import AudioFrame
 
 # ---------------------------
