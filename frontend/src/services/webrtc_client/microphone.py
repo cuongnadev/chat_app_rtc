@@ -5,7 +5,6 @@ import time
 from aiortc.mediastreams import AudioStreamTrack
 from av import AudioFrame
 
-
 class _MicrophoneCapture:
     """Microphone audio capture using PyAudio"""
 
@@ -14,9 +13,7 @@ class _MicrophoneCapture:
     ):
         self.sample_rate = sample_rate
         self.channels = channels
-        self.chunk_size = (
-            chunk_size  # Will be adjusted to total elements (samples * channels)
-        )
+        self.chunk_size = chunk_size  # Total elements (samples * channels)
         self.audio = None
         self.stream = None
         self.enabled = True
@@ -27,9 +24,7 @@ class _MicrophoneCapture:
         """Adjust chunk_size to 20ms per frame (WebRTC standard), total elements"""
         samples_20ms = int(0.02 * self.sample_rate)
         self.chunk_size = samples_20ms * self.channels
-        print(
-            f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz"
-        )
+        print(f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz")
 
     def _init_audio(self):
         """Initialize audio with error handling and device priority"""
@@ -43,16 +38,14 @@ class _MicrophoneCapture:
             for i in range(self.audio.get_device_count()):
                 info = self.audio.get_device_info_by_index(i)
                 if info.get("maxInputChannels") > 0:
-                    ch = int(info["maxInputChannels"])
-                    rate = int(info["defaultSampleRate"])
+                    ch = int(info['maxInputChannels'])
+                    rate = int(info['defaultSampleRate'])
                     print(f"  [{i}] {info['name']} - {ch}ch @ {rate}Hz")
-
+                    
                     # Prioritize: 1-2ch devices with rate close to target
                     if ch <= 2 and abs(rate - self.sample_rate) < 2000:
                         preferred_devices.append((i, info))
-                    elif (
-                        not selected_device and ch > 0
-                    ):  # Fallback to any if no preferred
+                    elif not selected_device and ch > 0:  # Fallback to any if no preferred
                         selected_device = info
 
             # Select first preferred if available
@@ -68,9 +61,7 @@ class _MicrophoneCapture:
             self._adjust_chunk_size()
 
             frames_per_buffer = self.chunk_size // self.channels  # Samples per channel
-            print(
-                f"🎤 Using device {device_index}: {selected_device['name']} at {self.sample_rate}Hz, {self.channels}ch"
-            )
+            print(f"🎤 Using device {device_index}: {selected_device['name']} at {self.sample_rate}Hz, {self.channels}ch")
             self.stream = self.audio.open(
                 format=pyaudio.paInt16,
                 channels=self.channels,
@@ -90,19 +81,23 @@ class _MicrophoneCapture:
                 self.audio = None
 
     def read(self):
-        """Read audio data as 1D interleaved array"""
+        """Read audio data as 2D (samples, channels)"""
         if not self.enabled or self.error or not self.stream:
             if self.error:
                 print("♻️ Retrying microphone init...")
                 time.sleep(1)
                 self._init_audio()
-            # Return silence 1D
-            return np.zeros(self.chunk_size, dtype=np.int16)
-
+            # Return silence 2D
+            samples_per_channel = self.chunk_size // self.channels
+            return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
+        
         try:
             frames_per_buffer = self.chunk_size // self.channels
             data = self.stream.read(frames_per_buffer, exception_on_overflow=False)
-            audio_array = np.frombuffer(data, dtype=np.int16)  # 1D interleaved
+            audio_array = np.frombuffer(data, dtype=np.int16)
+            # Reshape to (samples, channels) interleaved
+            samples_per_channel = len(audio_array) // self.channels
+            audio_array = audio_array.reshape(samples_per_channel, self.channels)
 
             # Debug: Log if capturing significant audio
             max_val = np.max(np.abs(audio_array))
@@ -113,7 +108,8 @@ class _MicrophoneCapture:
         except Exception as e:
             print(f"❌ Microphone read error: {e}")
             self.error = True
-            return np.zeros(self.chunk_size, dtype=np.int16)
+            samples_per_channel = self.chunk_size // self.channels
+            return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
 
     def set_enabled(self, enabled: bool):
         """Enable or disable microphone"""
@@ -142,7 +138,8 @@ class MicrophoneAudioTrack(AudioStreamTrack):
         samples = self.mic.read()
 
         if samples is None or len(samples) == 0 or samples.size == 0:
-            silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            silence = np.zeros((samples_per_channel, self.mic.channels), dtype=np.int16)
             samples = silence
 
         layout = "mono" if self.mic.channels == 1 else "stereo"
@@ -152,7 +149,8 @@ class MicrophoneAudioTrack(AudioStreamTrack):
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
         except Exception as e:
             print(f"⚠️ Audio frame build error: {e}, shape={samples.shape}")
-            silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            silence = np.zeros((samples_per_channel, self.mic.channels), dtype=np.int16)
             frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
 
         frame.sample_rate = self.mic.sample_rate
