@@ -87,17 +87,16 @@ class _MicrophoneCapture:
                 print("♻️ Retrying microphone init...")
                 self._init_audio()
             # Trả về silence đúng shape
-            return np.zeros((self.channels, self.chunk_size), dtype=np.int16)
-
+            return np.zeros(self.chunk_size, dtype=np.int16) if self.channels == 1 \
+               else np.zeros((self.chunk_size, self.channels), dtype=np.int16)
         try:
             data = self.stream.read(self.chunk_size, exception_on_overflow=False)
             audio_array = np.frombuffer(data, dtype=np.int16)
 
             if self.channels == 1:
-                # Mono → reshape thành (samples, 1)
-                audio_array = audio_array.reshape(-1, 1)
+                # Mono → chỉ cần (samples,)
+                audio_array = audio_array.flatten()
             elif self.channels > 1:
-                # Stereo → (samples, channels)
                 audio_array = audio_array.reshape(-1, self.channels)
 
             # Debug: Log if we're capturing significant audio
@@ -138,7 +137,10 @@ class MicrophoneAudioTrack(AudioStreamTrack):
         samples = self.mic.read()
 
         if samples is None or len(samples) == 0:
-            silence = np.zeros((self.mic.chunk_size, self.mic.channels), dtype=np.int16)
+            if self.mic.channels == 1:
+                silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            else:
+                silence = np.zeros((self.mic.chunk_size, self.mic.channels), dtype=np.int16)
             samples = silence
 
         layout = "mono" if self.mic.channels == 1 else "stereo"
