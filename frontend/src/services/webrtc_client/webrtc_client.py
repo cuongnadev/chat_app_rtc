@@ -282,7 +282,7 @@ class WebRTCClient(QObject):
             # track ended
             pass
 
-    async def _consume_remote_audio_track(self, track):
+    async def _consume_remote_audio_track(self, track: AudioStreamTrack):
         print("🔊 Starting remote audio track consumption...")
 
         p = pyaudio.PyAudio()
@@ -302,14 +302,14 @@ class WebRTCClient(QObject):
             print("⚠️ Cannot get default output device, using fallback")
             output_device_index = None
 
-        # Khởi tạo stream
+        frames_per_buffer = 1024
         stream = p.open(
             format=pyaudio.paInt16,
             channels=out_channels,
             rate=out_rate,
             output=True,
             output_device_index=output_device_index,
-            frames_per_buffer=1024
+            frames_per_buffer=frames_per_buffer
         )
         print("✅ Audio playback stream initialized")
 
@@ -317,24 +317,28 @@ class WebRTCClient(QObject):
             while True:
                 frame: AudioFrame = await track.recv()
                 audio_data = frame.to_ndarray(format="s16")
-
-                # Convert kênh
-                if audio_data.ndim == 1 and out_channels > 1:
-                    audio_data = np.tile(audio_data[:, None], (1, out_channels))
-                elif audio_data.ndim == 2 and audio_data.shape[1] != out_channels:
-                    if out_channels == 1:
-                        audio_data = np.mean(audio_data, axis=1).astype(np.int16)
-                    else:
-                        audio_data = audio_data[:, :out_channels]
+                print(f"📥 Received frame: {audio_data.shape}, sample_rate={frame.sample_rate}")
 
                 # Resample nếu sample rate khác
                 if frame.sample_rate != out_rate:
                     audio_data = ResampleAudio(audio_data, frame.sample_rate, out_rate)
-                    if out_channels > 1 and audio_data.ndim == 1:
-                        audio_data = np.tile(audio_data[:, None], (1, out_channels))
+
+                # Convert kênh
+                if audio_data.ndim == 1 and out_channels > 1:
+                    audio_data = np.tile(audio_data[:, None], (1, out_channels))
+                    print(f"🔀 Converted mono -> {out_channels}ch, shape={audio_data.shape}")
+                elif audio_data.ndim == 2 and audio_data.shape[1] != out_channels:
+                    if out_channels == 1:
+                        audio_data = np.mean(audio_data, axis=1).astype(np.int16)
+                        print(f"🔀 Converted stereo -> mono, shape={audio_data.shape}")
+                    else:
+                        audio_data = audio_data[:, :out_channels]
+                        print(f"🔀 Trimmed channels to {out_channels}, shape={audio_data.shape}")
 
                 # Ghi vào stream
                 stream.write(audio_data.astype(np.int16).tobytes())
+                print(f"▶️ Wrote {audio_data.shape[0]} frames to output")
+
         except Exception as e:
             print(f"⚠️ Track consumer stopped: {e}")
         finally:

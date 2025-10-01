@@ -8,9 +8,9 @@ def ResampleAudio(audio: np.ndarray, old_rate: int, new_rate: int) -> np.ndarray
     old_indices = np.arange(audio.shape[0])
     new_indices = np.linspace(0, audio.shape[0]-1, new_length)
     if audio.ndim == 1:
-        return np.interp(new_indices, old_indices, audio).astype(np.int16)
+        resampled = np.interp(new_indices, old_indices, audio)
     else:
-        resampled = []
-        for c in range(audio.shape[1]):
-            resampled.append(np.interp(new_indices, old_indices, audio[:, c]))
-        return np.stack(resampled, axis=1).astype(np.int16)
+        resampled = np.stack([np.interp(new_indices, old_indices, audio[:, c]) 
+                              for c in range(audio.shape[1])], axis=1)
+    print(f"🔄 Resampled audio from {old_rate}Hz to {new_rate}Hz, shape {audio.shape} -> {resampled.shape}")
+    return resampled.astype(np.int16)
