@@ -11,6 +11,7 @@ from av import VideoFrame, AudioFrame
 
 from .camera import _CameraCapture, CameraVideoTrack
 from .microphone import _MicrophoneCapture, MicrophoneAudioTrack
+from utils.resample_audio import ResampleAudio
 
 
 class WebRTCClient(QObject):
@@ -328,8 +329,7 @@ class WebRTCClient(QObject):
 
                 # Resample nếu sample rate khác
                 if frame.sample_rate != out_rate:
-                    import resampy
-                    audio_data = resampy.resample(audio_data, frame.sample_rate, out_rate)
+                    audio_data = ResampleAudio(audio_data, frame.sample_rate, out_rate)
                     if out_channels > 1 and audio_data.ndim == 1:
                         audio_data = np.tile(audio_data[:, None], (1, out_channels))
 
