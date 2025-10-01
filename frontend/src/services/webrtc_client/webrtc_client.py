@@ -282,51 +282,58 @@ class WebRTCClient(QObject):
             pass
 
     async def _consume_remote_audio_track(self, track):
+        # import pyaudio
+        # import numpy as np
+        # from av import AudioFrame
+
         print("🔊 Starting remote audio track consumption...")
 
+        # --- Liệt kê output devices ---
         p = pyaudio.PyAudio()
-
-        # --- Lấy thiết bị output mặc định ---
-        try:
-            default_info = p.get_default_output_device_info()
-            output_device_index = default_info["index"]
-            print(f"🎧 Using default output device: {default_info['name']} (index {output_device_index})")
-        except IOError:
-            # fallback: chọn thiết bị đầu tiên có maxOutputChannels > 0
-            output_device_index = None
-            for i in range(p.get_device_count()):
-                info = p.get_device_info_by_index(i)
-                if info.get('maxOutputChannels', 0) > 0:
-                    output_device_index = i
-                    print(f"🎧 Fallback to output device: {info['name']} (index {i})")
-                    break
+        output_device_index = None
+        print("🔍 Available output devices:")
+        for i in range(p.get_device_count()):
+            info = p.get_device_info_by_index(i)
+            if info.get("maxOutputChannels", 0) > 0:
+                print(f"  [{i}] {info['name']} - {info['maxOutputChannels']}ch")
+                if "alsa_output" in info['name'] or "Speaker" in info['name']:
+                    output_device_index = i  # ưu tiên loa chính
 
         if output_device_index is None:
-            print("❌ Không tìm thấy thiết bị playback, dùng mặc định PyAudio")
-            output_device_index = None
+            print("⚠️ No preferred device found, using default")
+            try:
+                default_info = p.get_default_output_device_info()
+                output_device_index = default_info["index"]
+                print(f"🎧 Default device: {default_info['name']} (index {output_device_index})")
+            except IOError:
+                print("❌ Không tìm thấy thiết bị playback, dùng mặc định PyAudio")
+                output_device_index = None
 
-
-        stream = p.open(format=pyaudio.paInt16,
-                        channels=1,
-                        rate=48000,
-                        output=True,
-                        output_device_index=output_device_index)
+        # --- Open PyAudio stream ---
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=48000,
+            output=True,
+            output_device_index=output_device_index,
+        )
         print("✅ Audio playback stream initialized (48kHz, mono)")
 
         try:
             while True:
                 frame: AudioFrame = await track.recv()
                 audio_data = frame.to_ndarray(format="s16")  # (ch, samples) hoặc (samples,)
-                layout = frame.layout.name
 
+                # --- convert stereo -> mono nếu cần ---
                 if audio_data.ndim == 2:
                     audio_data = np.mean(audio_data, axis=0).astype(np.int16)
 
+                # --- debug level ---
                 max_val = int(np.max(np.abs(audio_data)))
-                if max_val > 500:
-                    print(f"🔉 Remote frame: {audio_data.shape}, rate={frame.sample_rate}, "
-                        f"layout={layout}, level={max_val}")
+                if max_val > 0:
+                    print(f"🔉 Remote frame: shape={audio_data.shape}, max_val={max_val}")
 
+                # --- write to stream ---
                 stream.write(audio_data.tobytes())
         except Exception as e:
             print(f"⚠️ Track consumer stopped: {e}")
