@@ -23,8 +23,8 @@ class _MicrophoneCapture:
 
     def _adjust_chunk_size(self):
         """Adjust chunk_size to 20ms per frame (WebRTC standard)"""
-        frames_20ms = int(0.02 * self.sample_rate)
-        self.chunk_size = frames_20ms * self.channels  # Adjust for channels
+        samples_20ms = int(0.02 * self.sample_rate)
+        self.chunk_size = samples_20ms * self.channels  # Total samples for interleaved
         print(
             f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz"
         )
@@ -75,7 +75,7 @@ class _MicrophoneCapture:
                 input=True,
                 input_device_index=device_index,
                 frames_per_buffer=self.chunk_size
-                // self.channels,  # Per channel buffer
+                // self.channels,  # Samples per channel
             )
             self.error = False
             print("✅ Microphone initialized successfully")
@@ -88,27 +88,24 @@ class _MicrophoneCapture:
                 self.audio = None
 
     def read(self):
-        """Read audio data with consistent 2D shape (channels, samples)"""
+        """Read audio data with consistent shape (samples, channels)"""
         if not self.enabled or self.error or not self.stream:
             if self.error:
                 print("♻️ Retrying microphone init...")
                 time.sleep(1)  # Delay to avoid rapid loop
                 self._init_audio()
-            # Return silence with correct 2D shape
-            return np.zeros(
-                (self.channels, self.chunk_size // self.channels), dtype=np.int16
-            )
+            # Return silence with correct shape (samples, channels)
+            samples_per_channel = self.chunk_size // self.channels
+            return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
 
         try:
             data = self.stream.read(
                 self.chunk_size // self.channels, exception_on_overflow=False
             )
             audio_array = np.frombuffer(data, dtype=np.int16)
-            # Reshape to (samples, channels) then transpose to (channels, samples) for PyAV
+            # Reshape to (samples, channels) - interleaved format
             samples_per_channel = len(audio_array) // self.channels
-            audio_array = audio_array.reshape(
-                samples_per_channel, self.channels
-            ).T  # (channels, samples)
+            audio_array = audio_array.reshape(samples_per_channel, self.channels)
 
             # Debug: Log if capturing significant audio
             max_val = np.max(np.abs(audio_array))
@@ -119,9 +116,8 @@ class _MicrophoneCapture:
         except Exception as e:
             print(f"❌ Microphone read error: {e}")
             self.error = True
-            return np.zeros(
-                (self.channels, self.chunk_size // self.channels), dtype=np.int16
-            )
+            samples_per_channel = self.chunk_size // self.channels
+            return np.zeros((samples_per_channel, self.channels), dtype=np.int16)
 
     def set_enabled(self, enabled: bool):
         """Enable or disable microphone"""
@@ -150,10 +146,8 @@ class MicrophoneAudioTrack(AudioStreamTrack):
         samples = self.mic.read()
 
         if samples is None or len(samples) == 0 or samples.size == 0:
-            silence = np.zeros(
-                (self.mic.channels, self.mic.chunk_size // self.mic.channels),
-                dtype=np.int16,
-            )
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            silence = np.zeros((samples_per_channel, self.mic.channels), dtype=np.int16)
             samples = silence
 
         layout = "mono" if self.mic.channels == 1 else "stereo"
@@ -163,10 +157,8 @@ class MicrophoneAudioTrack(AudioStreamTrack):
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
         except Exception as e:
             print(f"⚠️ Audio frame build error: {e}, shape={samples.shape}")
-            silence = np.zeros(
-                (self.mic.channels, self.mic.chunk_size // self.mic.channels),
-                dtype=np.int16,
-            )
+            samples_per_channel = self.mic.chunk_size // self.mic.channels
+            silence = np.zeros((samples_per_channel, self.mic.channels), dtype=np.int16)
             frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
 
         frame.sample_rate = self.mic.sample_rate
