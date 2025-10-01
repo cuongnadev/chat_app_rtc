@@ -164,23 +164,28 @@ class MicrophoneAudioTrack(AudioStreamTrack):
                 )
 
         try:
-            # WORKAROUND: Convert stereo to mono for compatibility
-            if self.mic.channels > 1 and samples.ndim == 2:
-                # Average channels to create mono
-                samples = samples.mean(axis=1).astype(np.int16)
+            # Convert to mono if multi-channel
+            if self.mic.channels > 1:
+                if samples.ndim == 2:
+                    # samples shape is (frames, channels) - average across channels
+                    samples = samples.mean(axis=1).astype(np.int16)
+                elif samples.ndim == 1:
+                    # Already flattened interleaved format, reshape first
+                    samples_per_channel = len(samples) // self.mic.channels
+                    samples = samples.reshape(samples_per_channel, self.mic.channels)
+                    samples = samples.mean(axis=1).astype(np.int16)
 
-            # Ensure 1D and contiguous
+            # Ensure 1D and contiguous for mono layout
             if samples.ndim > 1:
                 samples = samples.flatten()
             samples = np.ascontiguousarray(samples)
 
-            layout = "mono"  # Force mono for now
-
-            frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
+            # Create frame with mono layout
+            frame = AudioFrame.from_ndarray(samples, format="s16", layout="mono")
             frame.sample_rate = self.mic.sample_rate
         except Exception as e:
             print(
-                f"⚠️ Audio frame build error: {e}, shape={samples.shape if samples is not None else None}"
+                f"⚠️ Audio frame build error: {e}, shape={samples.shape if samples is not None else None}, ndim={samples.ndim if samples is not None else None}"
             )
             # Create silence frame
             samples_per_channel = self.mic.chunk_size // self.mic.channels

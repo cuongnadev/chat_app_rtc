@@ -1,4 +1,5 @@
 import asyncio, threading, cv2, pyaudio, numpy as np
+from typing import Optional
 from PySide6.QtCore import QObject, Signal
 from aiortc import (
     RTCPeerConnection,
