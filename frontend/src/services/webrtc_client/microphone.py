@@ -22,9 +22,9 @@ class _MicrophoneCapture:
         self._init_audio()
 
     def _adjust_chunk_size(self):
-        """Adjust chunk_size to 20ms per frame (WebRTC standard), total elements"""
-        samples_20ms = int(0.02 * self.sample_rate)
-        self.chunk_size = samples_20ms * self.channels
+        """Adjust chunk_size to 20ms per frame (WebRTC standard)"""
+        frames_20ms = int(0.02 * self.sample_rate)
+        self.chunk_size = frames_20ms * self.channels  # Adjust for channels
         print(
             f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz"
         )
@@ -75,7 +75,8 @@ class _MicrophoneCapture:
                 rate=self.sample_rate,
                 input=True,
                 input_device_index=device_index,
-                frames_per_buffer=frames_per_buffer,
+                frames_per_buffer=self.chunk_size
+                // self.channels,  # Per channel buffer
             )
             self.error = False
             print("✅ Microphone initialized successfully")
@@ -91,19 +92,26 @@ class _MicrophoneCapture:
                 self.audio = None
 
     def read(self):
-        """Read audio data as 1D interleaved array"""
+        """Read audio data with consistent 2D shape (channels, samples)"""
         if not self.enabled or self.error or not self.stream:
             if self.error:
                 print("♻️ Retrying microphone init...")
                 time.sleep(1)
                 self._init_audio()
-            # Return silence 1D
-            return np.zeros(self.chunk_size, dtype=np.int16)
+            # Return silence with correct 2D shape
+            return np.zeros(
+                (self.channels, self.chunk_size // self.channels), dtype=np.int16
+            )
 
         try:
             frames_per_buffer = self.chunk_size // self.channels
             data = self.stream.read(frames_per_buffer, exception_on_overflow=False)
             audio_array = np.frombuffer(data, dtype=np.int16)
+            # Reshape to (samples, channels) then transpose to (channels, samples) for PyAV
+            samples_per_channel = len(audio_array) // self.channels
+            audio_array = audio_array.reshape(
+                samples_per_channel, self.channels
+            ).T  # (channels, samples)
 
             # Debug: Log if capturing significant audio
             max_val = np.max(np.abs(audio_array))
@@ -114,7 +122,9 @@ class _MicrophoneCapture:
         except Exception as e:
             print(f"❌ Microphone read error: {e}")
             self.error = True
-            return np.zeros(self.chunk_size, dtype=np.int16)
+            return np.zeros(
+                (self.channels, self.chunk_size // self.channels), dtype=np.int16
+            )
 
     def set_enabled(self, enabled: bool):
         """Enable or disable microphone"""
@@ -143,7 +153,13 @@ class MicrophoneAudioTrack(AudioStreamTrack):
         samples = self.mic.read()
 
         if samples is None or len(samples) == 0 or samples.size == 0:
-            samples = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            silence = np.zeros(
+                (self.mic.channels, self.mic.chunk_size // self.mic.channels),
+                dtype=np.int16,
+            )
+            samples = silence
+
+        layout = "mono" if self.mic.channels == 1 else "stereo"
 
         try:
             if samples.ndim > 1:
@@ -160,8 +176,10 @@ class MicrophoneAudioTrack(AudioStreamTrack):
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
         except Exception as e:
             print(f"⚠️ Audio frame build error: {e}, shape={samples.shape}")
-            silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
-            layout = "mono" if self.mic.channels == 1 else "stereo"
+            silence = np.zeros(
+                (self.mic.channels, self.mic.chunk_size // self.mic.channels),
+                dtype=np.int16,
+            )
             frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
 
         frame.sample_rate = self.mic.sample_rate
