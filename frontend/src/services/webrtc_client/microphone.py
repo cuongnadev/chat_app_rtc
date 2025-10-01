@@ -146,17 +146,22 @@ class MicrophoneAudioTrack(AudioStreamTrack):
             samples = np.zeros(self.mic.chunk_size, dtype=np.int16)
 
         try:
-            # Ensure samples is 1D for PyAV
             if samples.ndim > 1:
-                samples = samples.flatten(
-                    "C"
-                )  # Flatten in row-major (interleaved) order
+                samples = samples.flatten("C")
 
-            print(f"🔧 Frame shape before build: {samples.shape}, layout={layout}")
+            # 🔧 chọn layout theo số kênh
+            layout = "mono" if self.mic.channels == 1 else "stereo"
+
+            max_val = int(np.max(np.abs(samples)))
+            print(f"📤 Sending frame: {samples.shape[0]} samples, "
+                  f"rate={self.mic.sample_rate}, ch={self.mic.channels}, "
+                  f"layout={layout}, level={max_val}")
+
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
         except Exception as e:
             print(f"⚠️ Audio frame build error: {e}, shape={samples.shape}")
             silence = np.zeros(self.mic.chunk_size, dtype=np.int16)
+            layout = "mono" if self.mic.channels == 1 else "stereo"
             frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
 
         frame.sample_rate = self.mic.sample_rate

@@ -116,6 +116,7 @@ class WebRTCClient(QObject):
 
             @self.pc.on("track")
             async def on_track(track):
+                print(f"📥 New track received: {track.kind}")
                 print(f"📡 Received track: {track.kind}")
                 # Run consumers concurrently to avoid blocking other tracks
                 if track.kind == "video":
