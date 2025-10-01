@@ -165,42 +165,35 @@ class MicrophoneAudioTrack(AudioStreamTrack):
                     (samples_per_channel, self.mic.channels), dtype=np.int16
                 )
 
-        layout = "mono" if self.mic.channels == 1 else "stereo"
-
         try:
-            # PyAV expects:
-            # - Mono: 1D array (samples,)
-            # - Stereo: 2D array (samples, 2) - NOT interleaved
+            # WORKAROUND: Convert stereo to mono for compatibility
+            if self.mic.channels > 1 and samples.ndim == 2:
+                # Average channels to create mono
+                samples = samples.mean(axis=1).astype(np.int16)
+                print(
+                    f"🔄 Converted {self.mic.channels}ch to mono, shape={samples.shape}"
+                )
 
-            if self.mic.channels == 1:
-                # Ensure 1D for mono
-                if samples.ndim > 1:
-                    samples = samples.flatten()
-            else:
-                # Ensure 2D (samples, channels) for stereo
-                if samples.ndim == 1:
-                    # Convert interleaved 1D to 2D
-                    samples_per_channel = len(samples) // self.mic.channels
-                    samples = samples.reshape(samples_per_channel, self.mic.channels)
+            # Ensure 1D and contiguous
+            if samples.ndim > 1:
+                samples = samples.flatten()
+            samples = np.ascontiguousarray(samples)
+
+            layout = "mono"  # Force mono for now
 
             print(
-                f"🔧 Frame shape: {samples.shape}, layout={layout}, dtype={samples.dtype}"
+                f"🔧 Frame shape: {samples.shape}, layout={layout}, dtype={samples.dtype}, contiguous={samples.flags['C_CONTIGUOUS']}"
             )
             frame = AudioFrame.from_ndarray(samples, format="s16", layout=layout)
             frame.sample_rate = self.mic.sample_rate
         except Exception as e:
             print(
-                f"⚠️ Audio frame build error: {e}, shape={samples.shape}, layout={layout}"
+                f"⚠️ Audio frame build error: {e}, shape={samples.shape if samples is not None else None}"
             )
             # Create silence frame
             samples_per_channel = self.mic.chunk_size // self.mic.channels
-            if self.mic.channels == 1:
-                silence = np.zeros(samples_per_channel, dtype=np.int16)
-            else:
-                silence = np.zeros(
-                    (samples_per_channel, self.mic.channels), dtype=np.int16
-                )
-            frame = AudioFrame.from_ndarray(silence, format="s16", layout=layout)
+            silence = np.zeros(samples_per_channel, dtype=np.int16)
+            frame = AudioFrame.from_ndarray(silence, format="s16", layout="mono")
             frame.sample_rate = self.mic.sample_rate
 
         frame.pts, frame.time_base = await self.next_timestamp()
