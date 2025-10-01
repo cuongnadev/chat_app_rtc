@@ -286,30 +286,30 @@ class WebRTCClient(QObject):
 
         p = pyaudio.PyAudio()
 
-        # --- Lấy thiết bị output mặc định hoặc PulseAudio ---
-        output_device_index = None
-        for i in range(p.get_device_count()):
-            info = p.get_device_info_by_index(i)
-            if info.get('maxOutputChannels', 0) > 0:
-                name = info.get('name', '').lower()
-                # ưu tiên PulseAudio
-                if 'pulse' in name:
+        # --- Lấy thiết bị output mặc định ---
+        try:
+            default_info = p.get_default_output_device_info()
+            output_device_index = default_info["index"]
+            print(f"🎧 Using default output device: {default_info['name']} (index {output_device_index})")
+        except IOError:
+            # fallback: chọn thiết bị đầu tiên có maxOutputChannels > 0
+            output_device_index = None
+            for i in range(p.get_device_count()):
+                info = p.get_device_info_by_index(i)
+                if info.get('maxOutputChannels', 0) > 0:
                     output_device_index = i
+                    print(f"🎧 Fallback to output device: {info['name']} (index {i})")
                     break
-                if output_device_index is None:
-                    output_device_index = i  # fallback: device đầu tiên
 
         if output_device_index is None:
-            print("❌ Không tìm thấy thiết bị playback, dùng mặc định")
-            output_device_index = None  # PyAudio tự chọn
-
-        print(f"🎧 Using output device index: {output_device_index}")
+            print("❌ Không tìm thấy thiết bị playback, dùng mặc định PyAudio")
+            output_device_index = None
 
 
         stream = p.open(format=pyaudio.paInt16,
                         channels=1,
                         rate=48000,
-                        output=True
+                        output=True,
                         output_device_index=output_device_index)
         print("✅ Audio playback stream initialized (48kHz, mono)")
 
