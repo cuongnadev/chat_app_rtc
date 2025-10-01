@@ -9,6 +9,7 @@ from aiortc import (
 )
 from av import VideoFrame, AudioFrame
 from aiortc.mediastreams import AudioStreamTrack
+import traceback
 
 from .camera import _CameraCapture, CameraVideoTrack
 from .microphone import _MicrophoneCapture, MicrophoneAudioTrack
@@ -312,33 +313,68 @@ class WebRTCClient(QObject):
 
         try:
             while True:
-                frame: AudioFrame = await track.recv()
-                audio_data = frame.to_ndarray(format="s16")
-                print(f"📥 Received frame: shape={audio_data.shape}, sample_rate={frame.sample_rate}")
+                try:
+                    frame: AudioFrame = await track.recv()
+                    if frame is None or frame.samples == 0:
+                        print("⚠️ Empty frame received, skipping...")
+                        continue
+                except Exception as recv_e:
+                    print(f"❌ Error in track.recv(): {recv_e}")
+                    await asyncio.sleep(0.1)
+                    continue
 
-                # Resample nếu rate khác
+                audio_data = frame.to_ndarray(format="s16")
+                print(f"📥 Received frame: shape={audio_data.shape}, sample_rate={frame.sample_rate}, samples={frame.samples}")
+
+                # Resample nếu rate khác (sử dụng hàm ResampleAudio để xử lý planar/interleaved)
+                orig_samples = audio_data.shape[-1] if audio_data.ndim > 1 else len(audio_data)
                 if frame.sample_rate != out_rate:
                     audio_data = ResampleAudio(audio_data, frame.sample_rate, out_rate)
                     print(f"🔄 Resampled: new shape={audio_data.shape}, new_rate={out_rate}")
+                else:
+                    print(f"ℹ️ No resample needed: shape={audio_data.shape}")
 
-                # Convert kênh
-                if audio_data.ndim == 1 and out_channels > 1:
-                    audio_data = np.tile(audio_data[:, None], (1, out_channels))
-                    print(f"🔀 Mono -> {out_channels}ch: shape={audio_data.shape}")
-                elif audio_data.ndim == 2 and audio_data.shape[1] != out_channels:
-                    if out_channels == 1:
-                        audio_data = np.mean(audio_data, axis=1).astype(np.int16)
-                        print(f"🔀 Stereo -> Mono: shape={audio_data.shape}")
-                    else:
-                        audio_data = audio_data[:, :out_channels]
-                        print(f"🔀 Trimmed channels: shape={audio_data.shape}")
+                # Adjust channels (giả sử sau resample vẫn planar nếu input là planar)
+                if audio_data.ndim == 1:
+                    # Mono (samples,)
+                    if out_channels > 1:
+                        # Pad to planar stereo (2, samples)
+                        audio_data = np.tile(audio_data[None, :], (out_channels, 1))
+                        print(f"🔀 Mono -> {out_channels}ch planar: shape={audio_data.shape}")
+                elif audio_data.ndim == 2:
+                    # Planar (ch_in, samples)
+                    ch_in = audio_data.shape[0]
+                    if ch_in != out_channels:
+                        if out_channels == 1:
+                            audio_data = np.mean(audio_data, axis=0).astype(np.int16)  # (samples,)
+                            print(f"🔀 {ch_in}ch -> Mono: shape={audio_data.shape}")
+                        else:
+                            if ch_in < out_channels:
+                                # Pad zero channels
+                                pad = np.zeros((out_channels - ch_in, audio_data.shape[1]), dtype=np.int16)
+                                audio_data = np.vstack((audio_data, pad))
+                                print(f"🔀 Padded {ch_in}ch -> {out_channels}ch: shape={audio_data.shape}")
+                            else:
+                                # Trim channels
+                                audio_data = audio_data[:out_channels, :]
+                                print(f"🔀 Trimmed {ch_in}ch -> {out_channels}ch: shape={audio_data.shape}")
 
-                # Ghi stream
-                stream.write(audio_data.astype(np.int16).tobytes())
-                print(f"▶️ Wrote {audio_data.shape[0]} frames to output")
+                # Convert to interleaved flat array for PyAudio (samples * ch,)
+                if audio_data.ndim == 1:
+                    # Mono: already flat
+                    interleaved = audio_data.astype(np.int16)
+                else:
+                    # Planar (ch, samples) -> interleaved (samples * ch,)
+                    interleaved = audio_data.T.ravel().astype(np.int16)
+
+                # Write to stream
+                stream.write(interleaved.tobytes())
+                num_frames = len(interleaved) // out_channels
+                print(f"▶️ Wrote {num_frames} frames to output")
 
         except Exception as e:
             print(f"⚠️ Track consumer stopped: {e}")
+            traceback.print_exc()
         finally:
             stream.stop_stream()
             stream.close()
