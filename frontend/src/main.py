@@ -40,22 +40,22 @@ class ChatAppRTC(QWidget):
         # Main window content
         self.main_window = MainWindow()
 
-        # kết nối signals
+        # Connect signals
         self.client.usersUpdated.connect(self.main_window.chat_list.update_users)
         self.client.messageReceived.connect(self.on_message_received)
 
-        # khi bấm gửi tin nhắn
+        # When user sends a message
         self.main_window.chat_panel.area_message.messageSent.connect(self.send_message)
-        # khi chọn file
+        # When user selects a file
         self.main_window.chat_panel.area_message.file_selected.connect(self.send_file)
-        # khi nhận file
+        # When file is received
         self.client.fileReceived.connect(self.on_file_received)
 
         # WebRTC incoming offer (only if available)
         if WEBRTC_AVAILABLE:
             self.client.rtcOfferReceived.connect(self.on_incoming_offer)
 
-        # thông báo ChatClient GUI đã sẵn sàng
+        # Notify that ChatClient GUI is ready
         self.client.gui_ready()
 
         # Layout for central widget
@@ -67,7 +67,7 @@ class ChatAppRTC(QWidget):
         # Show the window
         self.show()
 
-        # connect call button (only if WebRTC available)
+        # Connect call button (only if WebRTC available)
         if WEBRTC_AVAILABLE:
             self.main_window.chat_panel.chat_header.button.clicked.connect(
                 self.start_call
@@ -80,9 +80,9 @@ class ChatAppRTC(QWidget):
     def send_message(self, message: str):
         current_item = self.main_window.chat_list.get_list_widget().currentItem()
         if current_item:
-            data = current_item.data(Qt.UserRole)  # giờ dict này có cả username
+            data = current_item.data(Qt.UserRole)
             print(f"data: {data}")
-            target = data["username"]  # lấy username
+            target = data["username"]
             self.client.send_message(target, message)
 
     def on_message_received(self, sender, message, sender_username):
@@ -94,31 +94,31 @@ class ChatAppRTC(QWidget):
         print("sender_username: ", sender_username)
         print("sender_username: ", target)
         if sender_username == target:
-            """Nhận tin nhắn từ server rồi append vào chat"""
+            """Received message from server and append to chat"""
             self.main_window.chat_panel.area_message.append_message(sender, message)
 
     def send_file(self, file_path: str):
         print("send_file called", file_path)
-        """Gửi file"""
+        """Send file"""
         current_item = self.main_window.chat_list.get_list_widget().currentItem()
 
         if current_item:
             data = current_item.data(Qt.UserRole)
             target = data["username"]
 
-            # hiển thị bubble sender với nút mở file
+            # display sender bubble with file open button
             self.main_window.chat_panel.area_message.append_message(
                 "Bạn", os.path.basename(file_path), local_path=file_path, is_sender=True
             )
 
-            # gửi file thực tế qua client
+            # send actual file through client
             self.client.send_file(target, file_path)
 
     def on_file_received(self, sender: str, filename: str, data: bytes):
-        # Không hiển thị nếu sender là chính mình
+        # Don't display if sender is self
         if sender == self.client.username:
             return
-        # hiển thị file dưới dạng "[File]: filename"
+        # Display file as "[File]: filename"
         self.main_window.chat_panel.area_message.append_message(
             sender, filename, file_data=data, is_sender=False
         )
@@ -161,17 +161,17 @@ class ChatAppRTC(QWidget):
             self.client.send_rtc_end(from_username)
             return
 
-        # find display name from current user list
+        # Find display name from current user list
         partner_display = from_username
         # prompt
         dlg = IncomingCallDialog(partner_display)
         if dlg.exec() == IncomingCallDialog.Accepted:
-            # show window and accept
+            # Show window and accept
             self._active_call_window = VideoCallWindow(self.webrtc, partner_display)
             self._active_call_window.show()
             self.webrtc.accept_offer(from_username, sdp)
         else:
-            # decline by sending end
+            # Decline by sending end
             self.client.send_rtc_end(from_username)
 
 

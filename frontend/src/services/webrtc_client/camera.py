@@ -1,14 +1,15 @@
+# This file provides classes for capturing video from a local camera using OpenCV
+# and integrating it as a video source for an `aiortc` WebRTC connection.
+# The `_CameraCapture` class runs in a background thread to continuously grab frames,
+# while `CameraVideoTrack` adapts this into a `VideoStreamTrack` consumable by `aiortc`.
+
 import threading, cv2, numpy as np, asyncio
 from typing import Optional
 from aiortc.mediastreams import VideoStreamTrack
 from av import VideoFrame
 
+
 class _CameraCapture(threading.Thread):
-    """Background camera capture thread.
-
-    Grabs frames from OpenCV and stores latest frame for both preview and WebRTC track.
-    """
-
     def __init__(
         self, device_index: int = 0, width: int = 640, height: int = 480, fps: int = 20
     ):

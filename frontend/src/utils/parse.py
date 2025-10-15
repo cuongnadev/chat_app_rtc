@@ -1,3 +1,6 @@
+# This file provides a utility function to parse a stream of data
+# that may contain multiple concatenated JSON objects.
+
 import json
 
 decoder = json.JSONDecoder()
@@ -11,5 +14,3 @@ def ParseStream(buffer):
         except json.JSONDecodeError:
             break
     return buffer
-
-from PySide6.QtCore import QThread, Signal

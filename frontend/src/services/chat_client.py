@@ -12,7 +12,7 @@ from utils.parse import ParseStream
 
 class ChatClient(QObject):
     messageReceived = Signal(str, str, str)  # from, message
-    usersUpdated = Signal(list)  # danh sách user online
+    usersUpdated = Signal(list)  # list of online users
     loginSuccess = Signal()
     connectionFailed = Signal(str)
     fileReceived = Signal(str, str, bytes)
@@ -26,15 +26,15 @@ class ChatClient(QObject):
         super().__init__()
         self.username = username
         self.display_name = display_name
-        self._gui_ready = False  # GUI đã connect signals chưa
-        self._cached_users = None  # lưu tạm danh sách users nếu emit trước
-        self.client = None  # chưa tạo socket
+        self._gui_ready = False  # GUI has connected signals
+        self._cached_users = None  # temporarily store user list if emitted before
+        self.client = None  # not create socket yet
         self._listening_thread = None
 
     def connect_to_server(self, host: str, port: int = 4105, timeout: float = 3.0):
-        """Kết nối socket với timeout"""
+        """Connect socket with timeout"""
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # set timeout ngắn
+        # set short timeout
         self.client.settimeout(timeout)
 
         try:
@@ -43,9 +43,9 @@ class ChatClient(QObject):
             self.connectionFailed.emit(str(e))
             return False
 
-        self.client.settimeout(None)  # chuyển về blocking mode bình thường
+        self.client.settimeout(None)  # transfer to blocking mode
 
-        # gửi login
+        # send login
         login_payload = json.dumps({
             "type": "LOGIN",
             "username": self.username,

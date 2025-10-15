@@ -11,12 +11,12 @@ from PySide6.QtCore import Qt
 from pathlib import Path
 from gui.widgets import ChatItemWidget
 
-# Lấy thư mục gốc project
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 
+
 class ChatList(QWidget):
-    def __init__(self, chat_list_data = []):
+    def __init__(self, chat_list_data=[]):
         super().__init__()
         self.chat_list_data = chat_list_data
         main_layout = QVBoxLayout()
@@ -116,14 +116,14 @@ class ChatList(QWidget):
         self.load_chats(self.chat_list_data)
 
     def update_users(self, users):
-        """Cập nhật danh sách user từ server"""
+        """Update user list from server"""
         self.chat_list_data = [
             {
                 "avatar": str(ASSETS_DIR / "avatar.png"),
                 "name": u["display_name"],
                 "username": u["username"],
                 "last_message": "",
-                "last_active_time": ""
+                "last_active_time": "",
             }
             for u in users
         ]
@@ -140,15 +140,17 @@ class ChatList(QWidget):
                 item.get("last_active_time", ""),
             )
 
-    def add_chat_item(self, avatar_path, name, username, last_message="", last_active_time=""):
+    def add_chat_item(
+        self, avatar_path, name, username, last_message="", last_active_time=""
+    ):
         widget = ChatItemWidget(avatar_path, name, last_message, last_active_time)
         item = QListWidgetItem()
         item.setSizeHint(widget.sizeHint())
         item.setData(
             Qt.UserRole,
             {
-                "name": name,          # display_name
-                "username": username,  # thêm username chuẩn
+                "name": name,
+                "username": username,
                 "avatar_path": avatar_path,
                 "last_message": last_message,
                 "last_active_time": last_active_time,

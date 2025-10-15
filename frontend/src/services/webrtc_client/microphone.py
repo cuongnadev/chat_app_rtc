@@ -1,3 +1,8 @@
+# This file provides classes for capturing audio from a local microphone using PyAudio
+# and integrating it as an audio source for an `aiortc` WebRTC connection.
+# The `_MicrophoneCapture` class handles device discovery and raw audio capture,
+# while `MicrophoneAudioTrack` adapts this into an `AudioStreamTrack` consumable by `aiortc`.
+
 import numpy as np
 import time
 import pyaudio
@@ -8,7 +13,9 @@ from av import AudioFrame
 class _MicrophoneCapture:
     """Microphone audio capture using PyAudio"""
 
-    def __init__(self, sample_rate: int = 48000, channels: int = 1, chunk_size: int = 960):
+    def __init__(
+        self, sample_rate: int = 48000, channels: int = 1, chunk_size: int = 960
+    ):
         self.sample_rate = sample_rate
         self.channels = channels
         self.chunk_size = chunk_size
@@ -21,7 +28,9 @@ class _MicrophoneCapture:
     def _adjust_chunk_size(self):
         samples_20ms = int(0.02 * self.sample_rate)
         self.chunk_size = samples_20ms * self.channels
-        print(f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz")
+        print(
+            f"🔧 Adjusted chunk_size to {self.chunk_size} for {self.channels}ch @ {self.sample_rate}Hz"
+        )
 
     def _init_audio(self):
         try:
@@ -53,7 +62,9 @@ class _MicrophoneCapture:
             self._adjust_chunk_size()
 
             frames_per_buffer = self.chunk_size // self.channels
-            print(f"🎤 Using device {device_index}: {selected_device['name']} at {self.sample_rate}Hz, {self.channels}ch")
+            print(
+                f"🎤 Using device {device_index}: {selected_device['name']} at {self.sample_rate}Hz, {self.channels}ch"
+            )
             self.stream = self.audio.open(
                 format=pyaudio.paInt16,
                 channels=self.channels,
@@ -64,7 +75,9 @@ class _MicrophoneCapture:
             )
             self.error = False
             print("✅ Microphone initialized successfully")
-            print(f"📊 Audio settings: {self.sample_rate}Hz, {self.channels}ch, {frames_per_buffer} frames/buffer")
+            print(
+                f"📊 Audio settings: {self.sample_rate}Hz, {self.channels}ch, {frames_per_buffer} frames/buffer"
+            )
         except Exception as e:
             print(f"❌ Microphone initialization failed: {e}")
             self.error = True
