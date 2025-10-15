@@ -1,15 +1,12 @@
-from PySide6.QtWidgets import (
-    QVBoxLayout,  QWidget
-)
-from gui.widgets import (
-    Header, AreaMessage
-)
+from PySide6.QtWidgets import QVBoxLayout, QWidget
+from gui.widgets import Header, AreaMessage
 from PySide6.QtCore import Qt
 from pathlib import Path
 
-# Lấy thư mục gốc project
+# Get root project directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
+
 
 class ChatPanel(QWidget):
     def __init__(self):
@@ -20,9 +17,11 @@ class ChatPanel(QWidget):
 
         # ========== Right Panel ==========
         # Header chat
-        self.chat_header = Header("Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatar.png"))
+        self.chat_header = Header(
+            "Chào mừng bạn đến với Chat App", str(ASSETS_DIR / "avatar.png")
+        )
 
-        # Content chat, Ô nhập tin nhắn + nút gửi
+        # Content chat, input message area + send button
         self.area_message = AreaMessage()
 
         chat_panel_layout.addWidget(self.chat_header)
@@ -31,7 +30,7 @@ class ChatPanel(QWidget):
         self.setLayout(chat_panel_layout)
 
     def change_chat(self, current_item, previous_item):
-        """Đổi tiêu đề chat khi click bên trái"""
+        """Change title when click on the left"""
         if current_item:
             data = current_item.data(Qt.UserRole)
             self.chat_header.setName(data["name"])

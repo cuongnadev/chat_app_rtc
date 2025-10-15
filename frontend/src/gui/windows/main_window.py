@@ -6,7 +6,7 @@ from pathlib import Path
 from gui.windows import ChatPanel
 from gui.widgets import Navigation, ChatList, Header, AreaMessage
 
-# Lấy thư mục gốc project
+# Get root project directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 
@@ -82,14 +82,14 @@ class MainWindow(QWidget):
         """
         )
 
-        # Khi chọn cuộc trò chuyện trong danh sách
+        # When selecting a conversation in the list
         self.chat_list.get_list_widget().currentItemChanged.connect(self.chat_panel.change_chat)
 
-        # Ẩn chat_list và chat_panel khi mở app
+        # Hide chat_list and chat_panel when opening the app
         self.chat_list.hide()
         self.chat_panel.hide()
 
-        # Connect nút Home và Messages
+        # Connect Home and Messages buttons
         self.navigation.home.clicked.connect(self.show_home)
         self.navigation.messages.clicked.connect(self.show_messages)
 

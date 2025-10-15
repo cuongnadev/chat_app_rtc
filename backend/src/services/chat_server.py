@@ -10,12 +10,12 @@ decoder = json.JSONDecoder()
 
 
 def broadcast_user_list():
-    """Gửi danh sách user tới tất cả client"""
+    """Send list of online users to all clients"""
     for username, info in list(clients.items()):
         users = [
             {"username": u, "display_name": c["display_name"]}
             for u, c in clients.items()
-            if u != username  # loại bỏ chính mình
+            if u != username
         ]
         payload = json.dumps({"type": "USERS", "users": users})
         try:
@@ -26,7 +26,7 @@ def broadcast_user_list():
 
 def send_to_client(target_username, payload):
     print("server: ", payload)
-    """Gửi payload JSON tới một client"""
+    """Send JSON payload to a client"""
     if target_username in clients:
         try:
             clients[target_username]["conn"].send(json.dumps(payload).encode())
@@ -44,7 +44,7 @@ def handle_client(conn, addr):
                 break
 
             buffer += raw
-            # parse nhiều JSON object trong buffer
+            # parse multiple JSON objects in buffer
             new_buffer = ""
             for msg in ParseStream(buffer):
                 if msg.get("type") == "LOGIN":
@@ -53,10 +53,10 @@ def handle_client(conn, addr):
                     clients[username] = {"conn": conn, "display_name": display_name}
                     print(f"{display_name} ({username}) joined")
 
-                    # gửi xác nhận LOGIN_OK cho client
+                    # Send LOGIN_OK confirmation to client
                     conn.send(json.dumps({"type": "LOGIN_OK"}).encode())
 
-                    # broadcast cho người khác
+                    # Broadcast to others
                     broadcast_user_list()
 
                 elif msg.get("type") == "MESSAGE":
@@ -68,7 +68,7 @@ def handle_client(conn, addr):
                             "type": "MESSAGE",
                             "from": display_name,
                             "message": text,
-                            "from_username": from_username
+                            "from_username": from_username,
                         }
                         send_to_client(target, payload)
                     else:
@@ -217,12 +217,7 @@ def app(port=4105):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # Có 2 lựa chọn:
-    # 1️⃣ Bind IP LAN cụ thể
     server.bind((ip_lan, port))
-    # 2️⃣ Hoặc bind tất cả interface
-    # server.bind(("0.0.0.0", port))
-
 
     server.listen()
     server.settimeout(1.0)

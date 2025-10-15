@@ -99,10 +99,10 @@ class Navigation(QWidget):
 
         self.home.setChecked(True)
 
-        # Khi nhấn Home → ẩn chat_list + chat_panel
+        # When pressing Home → hide chat_list + chat_panel
         self.home.clicked.connect(lambda: self.select_nav(self.home))
 
-        # Khi nhấn Messages → hiện chat_list + chat_panel
+        # When pressing Messages → show chat_list + chat_panel
         self.messages.clicked.connect(lambda: self.select_nav(self.messages))
 
     def select_nav(self, btn):

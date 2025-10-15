@@ -1,7 +1,15 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PySide6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QMessageBox,
+)
 
 from services.chat_client import ChatClient
 from utils import ConnectThread
+
 
 class LoginWindow(QDialog):
     def __init__(self):
@@ -38,14 +46,16 @@ class LoginWindow(QDialog):
             self.username_input.text().strip(),
             self.display_name_input.text().strip(),
         )
-    
+
     def attempt_login(self):
         server_ip, username, display_name = self.get_data()
         if not server_ip or not username:
-            QMessageBox.warning(self, "Lỗi nhập liệu", "Bạn phải nhập Server IP và Username!")
+            QMessageBox.warning(
+                self, "Lỗi nhập liệu", "Bạn phải nhập Server IP và Username!"
+            )
             return
 
-        self.ok_btn.setEnabled(False)  # disable nút để tránh click nhiều lần
+        self.ok_btn.setEnabled(False)
         self.thread = ConnectThread(username, display_name, server_ip)
         self.thread.finished.connect(self.on_connection_done)
         self.thread.start()
@@ -54,7 +64,6 @@ class LoginWindow(QDialog):
         self.ok_btn.setEnabled(True)
         if client:
             self.client = client
-            self.accept()  # login thành công
+            self.accept()
         else:
             QMessageBox.critical(self, "Lỗi kết nối", "Không thể kết nối tới server!")
-

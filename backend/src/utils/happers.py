@@ -3,6 +3,7 @@ import json
 
 decoder = json.JSONDecoder()
 
+
 def ParseStream(buffer):
     while buffer:
         try:
@@ -15,10 +16,10 @@ def ParseStream(buffer):
 
 
 def get_lan_ip():
-    """Lấy IP LAN của máy server"""
+    "Get the LAN IP address of the machine"
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Không cần kết nối thực sự, chỉ lấy IP của default route
+        # No need to actually connect, just get the IP of the default route
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     except Exception:
