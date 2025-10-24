@@ -5,14 +5,17 @@ from PySide6.QtCore import Qt
 from pathlib import Path
 from gui.windows import ChatPanel
 from gui.widgets import Navigation, ChatList, Header, AreaMessage
+from gui.widgets import GroupDialog
+from services.chat_client import ChatClient
 
 # Get root project directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 ASSETS_DIR = BASE_DIR / "assets"
 
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, client: ChatClient):
         super().__init__()
+        self.client = client
         self.setWindowTitle("Chat App RTC")
         self.resize(1100, 650)
 
@@ -92,6 +95,7 @@ class MainWindow(QWidget):
         # Connect Home and Messages buttons
         self.navigation.home.clicked.connect(self.show_home)
         self.navigation.messages.clicked.connect(self.show_messages)
+        self.navigation.groups.clicked.connect(self.showCreateGroups)
 
     def show_home(self):
         self.chat_list.hide()
@@ -111,3 +115,19 @@ class MainWindow(QWidget):
             self.chat_panel.show()
 
             self.chat_list.get_list_widget().setCurrentRow(0)
+
+    def showCreateGroups(self):
+        dialog = GroupDialog(self)
+        if dialog.exec():
+            data = dialog.get_result()
+            if not data:
+                return
+
+            mode = data["mode"]
+            group_name = data["group_name"]
+
+            if mode == "create":
+                members = [self.client.username]
+                self.client.create_group(group_name, members)
+            elif mode == "join":
+                self.client.join_group(group_name)

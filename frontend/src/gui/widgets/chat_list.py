@@ -116,18 +116,24 @@ class ChatList(QWidget):
         self.load_chats(self.chat_list_data)
 
     def update_users(self, users):
-        """Update user list from server"""
-        self.chat_list_data = [
-            {
-                "avatar": str(ASSETS_DIR / "avatar.png"),
+        self.chat_list_data = []
+        for u in users:
+            if u.get("type") == "group":
+                avatar = str(ASSETS_DIR / "group_avatar.png")
+            else:
+                avatar = str(ASSETS_DIR / "avatar.png")
+
+            self.chat_list_data.append({
+                "avatar": avatar,
                 "name": u["display_name"],
                 "username": u["username"],
+                "type": u.get("type", "user"),
                 "last_message": "",
                 "last_active_time": "",
-            }
-            for u in users
-        ]
+            })
+
         self.load_chats(self.chat_list_data)
+
 
     def load_chats(self, chat_list_data):
         self.list_widget.clear()
@@ -138,10 +144,11 @@ class ChatList(QWidget):
                 item["username"],
                 item.get("last_message", ""),
                 item.get("last_active_time", ""),
+                item_type=item.get("type", "user"),
             )
 
     def add_chat_item(
-        self, avatar_path, name, username, last_message="", last_active_time=""
+        self, avatar_path, name, username, last_message="", last_active_time="", item_type="user"
     ):
         widget = ChatItemWidget(avatar_path, name, last_message, last_active_time)
         item = QListWidgetItem()
@@ -154,6 +161,7 @@ class ChatList(QWidget):
                 "avatar_path": avatar_path,
                 "last_message": last_message,
                 "last_active_time": last_active_time,
+                "type": item_type
             },
         )
         self.list_widget.addItem(item)

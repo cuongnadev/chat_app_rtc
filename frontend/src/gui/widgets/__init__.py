@@ -7,3 +7,4 @@ from .button import Button
 from .login_window import LoginWindow
 from .chat_bubble import ChatBubble
 from .chat_area import ChatArea
+from .group_dialog import GroupDialog
