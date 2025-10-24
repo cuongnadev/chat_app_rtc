@@ -12,6 +12,7 @@ from utils.parse import ParseStream
 
 class ChatClient(QObject):
     messageReceived = Signal(str, str, str)  # from, message
+    groupMessageReceived = Signal(str, str, str)
     usersUpdated = Signal(list)  # list of online users
     loginSuccess = Signal()
     connectionFailed = Signal(str)
@@ -90,7 +91,6 @@ class ChatClient(QObject):
                             self._cached_users = users
 
                     elif payload["type"] in ("MESSAGE", "BROADCAST"):
-                        print("client: ", payload)
                         from_username = payload.get("from_username", None)
                         self.messageReceived.emit(payload["from"], payload["message"], from_username)
 
@@ -102,6 +102,12 @@ class ChatClient(QObject):
                         self.fileReceived.emit(
                             payload["from"], payload["filename"], raw_bytes
                         )
+
+                    elif payload["type"] == "GROUP_MESSAGE":
+                        from_user = payload["from"]
+                        group_name = payload["group_name"]
+                        message = payload["message"]
+                        self.groupMessageReceived.emit(group_name, from_user, message)
 
                     # WebRTC signaling messages from server
                     elif payload["type"] == "RTC_OFFER":
@@ -202,4 +208,30 @@ class ChatClient(QObject):
                 "from": self.username,
             }
         )
+        self.client.sendall(payload.encode())
+
+    def create_group(self, group_name, members):
+        payload = json.dumps({
+            "type": "CREATE_GROUP",
+            "group_name": group_name,
+            "members": members
+        })
+        self.client.sendall(payload.encode())
+        print("📤 Sending CREATE_GROUP:", payload)
+
+    def send_group_message(self, group_name, msg):
+        payload = json.dumps({
+            "type": "GROUP_MESSAGE",
+            "group_name": group_name,
+            "from": self.username,
+            "message": msg
+        })
+        self.client.sendall(payload.encode())
+
+    def join_group(self, group_name):
+        payload = json.dumps({
+            "type": "JOIN_GROUP",
+            "username": self.username,
+            "group_name": group_name
+        })
         self.client.sendall(payload.encode())

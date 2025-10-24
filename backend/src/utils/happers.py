@@ -11,7 +11,7 @@ def ParseStream(buffer):
             yield obj
             buffer = buffer[idx:].lstrip()
         except json.JSONDecodeError:
-            break
+            return buffer
     return buffer
 
 

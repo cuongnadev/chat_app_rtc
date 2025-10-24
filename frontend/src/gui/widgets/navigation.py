@@ -19,7 +19,7 @@ class Navigation(QWidget):
         # allow stylesheet to paint the widget background
         self.setAttribute(Qt.WA_StyledBackground, True)
 
-        main_layout = QVBoxLayout();
+        main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 10, 0, 10)
         main_layout.setAlignment(Qt.AlignTop)
 
@@ -76,6 +76,25 @@ class Navigation(QWidget):
 
         main_layout.addLayout(nav_layout)
         main_layout.addStretch()
+
+        # group
+        self.groups = QPushButton()
+        self.groups.setFixedSize(40, 40)
+        groups_path = str(ASSETS_DIR / "groups.svg")
+        self.groups.setIcon(QIcon(groups_path))
+        self.groups.setIconSize(QSize(24, 24))
+        self.groups.setStyleSheet("""
+            QPushButton {
+                border-radius: 20px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: rgba(97, 94, 240, 0.10);
+            }
+        """)
+        self.groups.setCursor(QCursor(Qt.PointingHandCursor))
+        main_layout.addWidget(self.groups, alignment=Qt.AlignCenter)
+        self.groups.setCheckable(True)
 
         # setting
         self.settings = QPushButton()

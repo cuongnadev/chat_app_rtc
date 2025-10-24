@@ -6,6 +6,7 @@ import sys
 from utils import ParseStream, get_lan_ip
 
 clients = {}  # username -> {"conn": socket, "display_name": str}
+groups = {}  # group_name -> {"members": [usernames]}
 decoder = json.JSONDecoder()
 
 
@@ -17,7 +18,12 @@ def broadcast_user_list():
             for u, c in clients.items()
             if u != username
         ]
-        payload = json.dumps({"type": "USERS", "users": users})
+        group_list = [
+            {"username": g, "display_name": f"#{g}", "type": "group"}
+            for g in groups.keys()
+            if username in groups[g]["members"]
+        ]
+        payload = json.dumps({"type": "USERS", "users": users + group_list})
         try:
             info["conn"].send(payload.encode())
         except:
@@ -199,6 +205,61 @@ def handle_client(conn, addr):
                                 }
                             ).encode()
                         )
+
+                elif msg.get("type") == "JOIN_GROUP":
+                    group_name = msg.get("group_name")
+                    username = msg.get("username")
+
+                    if group_name not in groups:
+                        conn.send(json.dumps({
+                            "type": "ERROR",
+                            "message": f"Group '{group_name}' does not exist."
+                        }).encode())
+                    else:
+                        members = groups[group_name]["members"]
+                        if username not in members:
+                            members.append(username)
+                            print(f"{username} joined group {group_name}")
+                            broadcast_user_list()  # cập nhật danh sách cho tất cả
+                            conn.send(json.dumps({
+                                "type": "SUCCESS",
+                                "message": f"Joined group '{group_name}' successfully!"
+                            }).encode())
+                        else:
+                            conn.send(json.dumps({
+                                "type": "INFO",
+                                "message": f"You are already in group '{group_name}'."
+                            }).encode())
+
+                elif msg.get("type") == "CREATE_GROUP":
+                    group_name = msg.get("group_name")
+                    members = msg.get("members", [])
+                    if group_name not in groups:
+                        groups[group_name] = {"members": members}
+                        print(f"Group created: {group_name} -> {members}")
+                        broadcast_user_list()
+                    else:
+                        conn.send(json.dumps({
+                            "type": "ERROR",
+                            "message": f"Group {group_name} already exists"
+                        }).encode())
+
+                elif msg.get("type") == "GROUP_MESSAGE":
+                    group_name = msg.get("group_name")
+                    text = msg.get("message")
+                    from_username = msg.get("from")
+
+                    if group_name in groups:
+                        members = groups[group_name]["members"]
+                        payload = {
+                            "type": "GROUP_MESSAGE",
+                            "from": from_username,
+                            "group_name": group_name,
+                            "message": text,
+                        }
+                        for member in members:
+                            if member in clients and member != from_username:
+                                send_to_client(member, payload)
 
             buffer = new_buffer
 

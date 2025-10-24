@@ -38,11 +38,13 @@ class ChatAppRTC(QWidget):
         self.resize(1100, 650)
 
         # Main window content
-        self.main_window = MainWindow()
+        self.main_window = MainWindow(self.client)
 
         # Connect signals
         self.client.usersUpdated.connect(self.main_window.chat_list.update_users)
         self.client.messageReceived.connect(self.on_message_received)
+        self.client.groupMessageReceived.connect(self.on_group_message_received)
+
 
         # When user sends a message
         self.main_window.chat_panel.area_message.messageSent.connect(self.send_message)
@@ -81,9 +83,11 @@ class ChatAppRTC(QWidget):
         current_item = self.main_window.chat_list.get_list_widget().currentItem()
         if current_item:
             data = current_item.data(Qt.UserRole)
-            print(f"data: {data}")
             target = data["username"]
-            self.client.send_message(target, message)
+            if data.get("type") == "group":
+                self.client.send_group_message(target, message)
+            else:
+                self.client.send_message(target, message)
 
     def on_message_received(self, sender, message, sender_username):
 
@@ -91,11 +95,19 @@ class ChatAppRTC(QWidget):
         data = current_item.data(Qt.UserRole)
         target = data["username"]
 
-        print("sender_username: ", sender_username)
-        print("sender_username: ", target)
         if sender_username == target:
             """Received message from server and append to chat"""
             self.main_window.chat_panel.area_message.append_message(sender, message)
+
+    def on_group_message_received(self, group_name, sender, message):
+        current_item = self.main_window.chat_list.get_list_widget().currentItem()
+        if not current_item:
+            return
+
+        data = current_item.data(Qt.UserRole)
+        if data.get("type") == "group" and data["username"] == group_name:
+            self.main_window.chat_panel.area_message.append_message(sender, message)
+
 
     def send_file(self, file_path: str):
         print("send_file called", file_path)
